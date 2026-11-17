@@ -48,7 +48,6 @@ contract TaskEscrowTest is Test {
             keccak256("SubLeg(bytes32 agreementId,address subAgent,uint256 price,bytes32 termsHash,uint256 nonce)"), AID, sub, p, th, nonce)));
     }
     function _fundWallet() internal { vm.prank(client); task.fund{value: PRICE}(); }
-    function _fundX402() internal { vm.deal(address(task), PRICE); task.confirmFunding(); } // native transfer, no code run
     function _addSub(address payable sub, uint256 p, uint256 nonce) internal returns (uint256) {
         bytes memory sig = _subLeg(sub, p, SUBTERMS, nonce);
         vm.prank(operator);
@@ -68,19 +67,6 @@ contract TaskEscrowTest is Test {
         assertEq(address(task).balance, PRICE);
     }
 
-    function test_fundByX402NativeTransfer_thenConfirm() public {
-        vm.deal(address(task), PRICE); // what an x402 settlement does: balance rises, no function runs
-        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Created));
-        task.confirmFunding();
-        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Funded));
-    }
-
-    function test_confirmFundingRevertsWhenUnderfunded() public {
-        vm.deal(address(task), PRICE - 1);
-        vm.expectRevert(TaskEscrow.NotFunded.selector);
-        task.confirmFunding();
-    }
-
     function test_walletFundGuards() public {
         vm.prank(client);
         vm.expectRevert(TaskEscrow.WrongAmount.selector);
@@ -93,7 +79,7 @@ contract TaskEscrowTest is Test {
 
     // ---------- settlement ----------
     function test_release_paysAgentAWholeBalance() public {
-        _fundX402();
+        _fundWallet();
         uint256 before = agentA.balance;
         _submitAndRelease();
         assertEq(agentA.balance - before, PRICE);
@@ -102,7 +88,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_refund_returnsToClient_andVoidsSubLegs() public {
-        _fundX402();
+        _fundWallet();
         _addSub(agentB, 2 ether, 1);
         vm.prank(agentA);
         task.submit(keccak256("work"));
@@ -114,7 +100,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_wrongVerdictDirectionAndReplay() public {
-        _fundX402();
+        _fundWallet();
         vm.prank(agentA);
         task.submit(bytes32(0));
         bytes memory passSig = _verdict(1, 1);
@@ -129,7 +115,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_deadlineRefund() public {
-        _fundX402();
+        _fundWallet();
         vm.expectRevert(TaskEscrow.TooEarly.selector);
         task.refundAfterDeadline();
         vm.warp(block.timestamp + 1 days + 1);
@@ -140,7 +126,7 @@ contract TaskEscrowTest is Test {
 
     // ---------- sub-legs (A -> B), max 2 hops ----------
     function test_addSubLeg_recordsLegAndCountsTowardsCap() public {
-        _fundX402();
+        _fundWallet();
         uint256 id = _addSub(agentB, 2 ether, 1);
         assertEq(id, 1);
         assertEq(task.legCount(), 2);
@@ -152,7 +138,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_subLegCapIsEnforced() public {
-        _fundX402();
+        _fundWallet();
         _addSub(agentB, 2 ether, 1);                  // 2 of 3 QOR cap
         bytes memory tooMuch = _subLeg(agentC, 1 ether + 1, SUBTERMS, 2);
         vm.prank(operator);
@@ -162,7 +148,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_subLegCountLimit() public {
-        _fundX402();
+        _fundWallet();
         _addSub(agentB, 1 ether, 1);
         _addSub(agentC, 1 ether, 2);
         bytes memory sig = _subLeg(address(0xD0D), 1e7, SUBTERMS, 3);
@@ -172,7 +158,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_subLegGuards() public {
-        _fundX402();
+        _fundWallet();
         bytes memory good = _subLeg(agentB, 1 ether, SUBTERMS, 1);
         // only the operator
         vm.expectRevert(TaskEscrow.NotAllowed.selector);
@@ -204,7 +190,7 @@ contract TaskEscrowTest is Test {
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.WrongState.selector);
         task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, sig); // not funded yet
-        _fundX402();
+        _fundWallet();
         _submitAndRelease();
         bytes memory sig2 = _subLeg(agentB, 1 ether, SUBTERMS, 2);
         vm.prank(operator);
@@ -212,9 +198,9 @@ contract TaskEscrowTest is Test {
         task.addSubLeg(agentB, 1 ether, SUBTERMS, 2, sig2); // released
     }
 
-    // ---------- A pays B over x402; receipt recorded; default after grace ----------
+    // ---------- A pays B with a native QOR transfer; receipt recorded; default after grace ----------
     function test_owedThenRecordPayout() public {
-        _fundX402();
+        _fundWallet();
         uint256 id = _addSub(agentB, 2 ether, 1);
         assertFalse(task.owed(id));          // not owed until the task is released
         _submitAndRelease();
@@ -227,7 +213,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_recordPayoutGuards() public {
-        _fundX402();
+        _fundWallet();
         uint256 id = _addSub(agentB, 2 ether, 1);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.WrongState.selector);
@@ -246,7 +232,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_defaultAfterGrace_andCannotRecordAfterwards() public {
-        _fundX402();
+        _fundWallet();
         uint256 id = _addSub(agentB, 2 ether, 1);
         _submitAndRelease();
         vm.expectRevert(TaskEscrow.TooEarly.selector);
@@ -262,7 +248,7 @@ contract TaskEscrowTest is Test {
     }
 
     function test_paidLegCannotBeMarkedDefault() public {
-        _fundX402();
+        _fundWallet();
         uint256 id = _addSub(agentB, 2 ether, 1);
         _submitAndRelease();
         vm.prank(operator);
@@ -276,11 +262,11 @@ contract TaskEscrowTest is Test {
     function test_signatureFromAnotherTaskIsRejected() public {
         vm.prank(designer);
         TaskEscrow other = TaskEscrow(factory.createTask(keccak256("agreement-2"), client, agentA, PRICE, uint64(block.timestamp + 1 days), MAX_SUB_BPS, MAX_SUB_LEGS, GRACE, TERMS));
-        vm.deal(address(other), PRICE);
-        other.confirmFunding();
+        vm.prank(client);
+        other.fund{value: PRICE}();
         vm.prank(agentA);
         other.submit(bytes32(0));
-        _fundX402();
+        _fundWallet();
         bytes memory sigForFirst = _verdict(1, 3);
         vm.expectRevert(TaskEscrow.BadSignature.selector);
         other.release(3, sigForFirst);

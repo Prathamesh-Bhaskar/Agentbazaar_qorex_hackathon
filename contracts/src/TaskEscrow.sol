@@ -76,7 +76,6 @@ contract TaskEscrow {
     error WrongState();
     error NotAllowed();
     error WrongAmount();
-    error NotFunded();
     error BadSignature();
     error NonceUsed();
     error TransferFailed();
@@ -108,15 +107,6 @@ contract TaskEscrow {
         if (msg.value != price) revert WrongAmount();
         state = State.Funded;
         emit Funded(agreementId, client, msg.value);
-    }
-
-    /// @notice x402 path: the client paid this contract's Hedera account with a native transfer, which runs no
-    /// contract code. Anyone may call this once the balance covers the price; it flips the state and emits Funded.
-    function confirmFunding() external {
-        if (state != State.Created) revert WrongState();
-        if (address(this).balance < price) revert NotFunded();
-        state = State.Funded;
-        emit Funded(agreementId, client, address(this).balance);
     }
 
     // ---------------- A -> B legs (max 2 hops: client->A, A->B) ----------------
