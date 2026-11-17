@@ -11,7 +11,9 @@ verification on NEAR AI Cloud passes) and move the money layer from Hedera testn
 (`qorechain-diana`). Add the post-quantum story: every agent-to-agent payment carries a hybrid
 secp256k1 + ML-DSA-87 signature.
 
-Non-goals: mainnet; changing the verification, benchmark or NEAR AI flow; new product features; SVM or CosmWasm lanes.
+Non-goals: mainnet; changing the verification or benchmark logic; new product features; SVM or CosmWasm lanes.
+
+Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is removed from this port (see R10).
 
 ## 2. Confirmed facts (phase 0, run on the live testnet, 17 Nov 2026)
 
@@ -31,6 +33,19 @@ Non-goals: mainnet; changing the verification, benchmark or NEAR AI flow; new pr
 Deployer account (public): `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3`. Test contract (throwaway): `0xb66Ba6F63f7D25975c44502E02f22f8C9D0ef792`.
 Secrets (`QORE_DEPLOYER_PRIVATE_KEY`, `QORE_PQC_RECOVERY_CODE`) live only in git-ignored `.env` files.
 
+Accounts (public addresses; keys and PQC recovery codes are in the git-ignored `backend/.env`):
+
+| Role | `0x` address | Sends EVM txs |
+|---|---|---|
+| operator / relayer / factory owner | `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3` | yes |
+| designer | `0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9` | yes |
+| verifier | `0xbF4EbcBB325E4d0e8D0Bc44D3faF8CC70c9610fC` | no, signs verdicts only |
+| agent solidity-dev | `0x8B4F0927894Dcb933aB847a71f048d21171C73B7` | pays sub-agents |
+| agent security-auditor | `0xeA953851bF7f784aeBf1EBaFc9E4A96daE7116B3` | receives |
+| agent test-writer | `0x13F83608C9201F6a287e3D0bEB813683C75048D5` | pays/receives |
+| agent docs-writer | `0x767F579e23f124496004dF82F3138Bfd29A18e99` | pays/receives |
+| agent dapp-dev | `0xF156bfc4e048391E3ABB8A5C5C76ec19626Ced43` | pays/receives |
+
 ## 3. What replaces what
 
 | Area | Today (Hedera) | QoreChain | Files |
@@ -44,10 +59,11 @@ Secrets (`QORE_DEPLOYER_PRIVATE_KEY`, `QORE_PQC_RECOVERY_CODE`) live only in git
 | Agent-to-agent payment | x402 over Hedera (`@x402/hedera`, Blocky402 facilitator) | hybrid-signed native QOR transfer from the lead agent's account (see R4) | `x402/gateway.ts`, live agents |
 | Client funding | MetaMask `fund()` or x402 `confirmFunding` | wallet `fund()` only | `frontend`, contracts |
 | Tx admission | none | registered PQC key + open EVM window for every account that sends EVM txs | `chain/client.ts`, designer, live agents |
+| AI inference (benchmark, verification, checklists, agents) | NEAR AI Cloud by default, signed responses | NVIDIA only (`LLM_PROVIDER=nvidia`), no hardware attestation | `backend/src/lib/llm.ts`, `nearProof.ts`, `nearModels.ts`, `live-agents/src/llm.ts`, `solidity-agent` |
 | Verdict signing | EIP-712 secp256k1 | unchanged (domain chainId becomes 9800) | `chain/client.ts` |
 | Contracts | `paris` EVM target, tinybar comments | same Solidity, wei units, renamed `payoutRef` | `contracts/` |
 
-Unchanged: NEAR AI inference and proofs, benchmark, Fastify routes, Postgres schema shape, designer logic, frontend structure.
+Unchanged: benchmark logic, Fastify routes, Postgres schema shape, designer logic, frontend structure.
 
 ## 4. Requirements
 
@@ -92,15 +108,22 @@ hybrid payment code from R4. The designer deploys through the factory under R3.
 lists the testnet addresses and contract addresses, and explains the post-quantum angle. Prompts and planning notes go
 in `docs/ai-usage/`. Demo video at most 3 minutes, recorded on QoreChain.
 
+**R10 AI layer is NVIDIA only.** `LLM_PROVIDER` defaults to `nvidia` and the NEAR code path is deleted (`nearProof.ts`,
+`nearModels.ts`, NEAR env vars, NEAR copy on the landing page, README and `ProofBadge`). The verification result no longer
+claims a TEE or signed-response proof, because NVIDIA's hosted API provides none. The UI says "verified by an
+NVIDIA-hosted model" and shows the checks, never an attestation badge. Rule 5 still holds: an NVIDIA outage, rate limit or
+bad key is an infrastructure error and never a FAIL verdict. Schema: the proof columns stay but hold `none`; a new migration
+is not needed.
+
 **R9 (stretch, not committed).** Verifier verdicts also signed with ML-DSA-87 and checked in `release()` through the PQC
 Verify precompile. Only after its ABI is read from the official docs and confirmed on the testnet (Q2).
 
 ## 5. Acceptance criteria
 
 1. Golden path on chain 9800: post job, quote, accept (contract deployed by the factory), client `fund()` from QoreX,
-   agent delivers, NEAR AI verdict PASS with `tee_signature`, `release()`, lead agent pays sub-agent with a hybrid-signed
+   agent delivers, NVIDIA-verified verdict PASS, `release()`, lead agent pays sub-agent with a hybrid-signed
    transfer, `recordPayout`, UI shows explorer links for every step.
-2. Failure path: verdict FAIL leads to `refund()`; an infrastructure error never produces a FAIL (rule 5).
+2. Failure path: verdict FAIL leads to `refund()`; an infrastructure error (including an NVIDIA failure) never produces a FAIL (rule 5).
 3. A window running out mid-job is re-opened automatically and the job still finishes.
 4. `forge test` and the backend unit tests pass; no `.env` or key in git (secret scan clean).
 5. A recorded payout whose chain receipt does not match is rejected.
@@ -120,7 +143,7 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 | Phase | Work | Days |
 |---|---|---|
 | 1 | Contracts: units, rename, tests, deploy factory on 9800 (answers Q4) | 1 |
-| 2 | Backend: env, viem chain, indexer, window manager (R1, R3, R5) | 3 |
+| 2 | Backend: env, viem chain, indexer, window manager, NVIDIA-only AI layer (R1, R3, R5, R10) | 3 |
 | 3 | Agent payments and live agents (R4, R7) (answers Q6) | 2 |
 | 4 | Frontend: chain, units, explorer, funding flow with QoreX (R6) (answers Q1) | 2 |
 | 5 | End-to-end golden and failure runs on testnet | 1 |
