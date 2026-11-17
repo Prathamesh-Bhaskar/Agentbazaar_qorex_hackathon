@@ -25,6 +25,9 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | A plain secp256k1 key (no wallet extension) can register its PQC key | tx `AD30D861E8E065AA7A0B5A28A8C646B6FA164FC257910CFD427AE6CA1573E5A2`, `MsgRegisterPQCKeyV2`, classical signature only, fee 0.08 QOR, gas 299,233 |
 | The same key can then open an EVM window with a hybrid signature | tx `D7E300E51DA2E22F3407D5D65DE49D5DD100C7C4BA5500F0DB29D21C63164585`, 17,280 blocks, 20 txs, 10,000,000 uqor |
 | A Foundry `cast send --create` deploy works inside the window | tx `0xeffc040efb67966027248af79c6a03604818069813737851fc3b94baf3c64901`, gas 55,330; window then showed 1/20 txs, 6,640 uqor used |
+| Designer and the 5 agent accounts registered their PQC keys the same way (classical signature, code 0) | txs `6C57248E…F0B0`, `DC3C931D…BEF3`, `9468EBBB…2AA9`, `1D383735…EE6A`, `E96B5463…B892`, `8F9D97FA…969F1` |
+| A hybrid-signed `MsgSend` from an agent account works; the REST receipt shows `MsgSend`, sender, recipient, amount and a `PQCHybridSignature` extension (ML-DSA-87) | tx `29CE54CEB6E3B2408B20E71407DA7B302ABCE96B3D40A23535C101BAAD528B8C`, 0.01 QOR, via `EthNativeSigner.bankSend`; receipt read from `cosmos/tx/v1beta1/txs/{hash}` |
+| A larger window replaces the previous one and EVM value transfers count against `maxValue` | window re-opened with 50,000,000 uqor; six transfers (35 QOR) then succeeded |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -136,7 +139,7 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 - **Q3** Finality and reorg behaviour of the EVM RPC.
 - **Q4** Whether Foundry's `paris` output deploys the real `TaskEscrow` (only a 10-byte contract is tested so far).
 - **Q5** Rate limits on the public RPC and REST endpoints for the indexer.
-- **Q6** Whether `EthNativeSigner` hybrid signing of `MsgSend` works for an agent process end to end (the window message did).
+- **Q6** ANSWERED 17 Nov: hybrid `MsgSend` works from an agent account (see section 2). Still to build: the agent-side code in `live-agents` and the backend's receipt check.
 
 ## 7. Plan (15 days; today is 17 Nov)
 
