@@ -18,8 +18,8 @@ contract TaskEscrowTest is Test {
     address payable agentB = payable(address(0xB0B));
     address payable agentC = payable(address(0xC0C));
 
-    uint256 constant PRICE = 10 * 1e8;      // 10 HBAR in tinybar
-    uint16 constant MAX_SUB_BPS = 3_000;    // sub-legs may take 30% = 3 HBAR
+    uint256 constant PRICE = 10 ether;      // 10 QOR in wei
+    uint16 constant MAX_SUB_BPS = 3_000;    // sub-legs may take 30% = 3 QOR
     uint8 constant MAX_SUB_LEGS = 2;
     uint32 constant GRACE = 1 hours;
     bytes32 constant AID = keccak256("agreement-1");
@@ -103,7 +103,7 @@ contract TaskEscrowTest is Test {
 
     function test_refund_returnsToClient_andVoidsSubLegs() public {
         _fundX402();
-        _addSub(agentB, 2 * 1e8, 1);
+        _addSub(agentB, 2 ether, 1);
         vm.prank(agentA);
         task.submit(keccak256("work"));
         bytes memory sig = _verdict(0, 7);
@@ -141,30 +141,30 @@ contract TaskEscrowTest is Test {
     // ---------- sub-legs (A -> B), max 2 hops ----------
     function test_addSubLeg_recordsLegAndCountsTowardsCap() public {
         _fundX402();
-        uint256 id = _addSub(agentB, 2 * 1e8, 1);
+        uint256 id = _addSub(agentB, 2 ether, 1);
         assertEq(id, 1);
         assertEq(task.legCount(), 2);
-        assertEq(task.subTotal(), 2 * 1e8);
+        assertEq(task.subTotal(), 2 ether);
         (address payee, uint256 p, bytes32 th,) = task.leg(1);
         assertEq(payee, agentB);
-        assertEq(p, 2 * 1e8);
+        assertEq(p, 2 ether);
         assertEq(th, SUBTERMS);
     }
 
     function test_subLegCapIsEnforced() public {
         _fundX402();
-        _addSub(agentB, 2 * 1e8, 1);                  // 2 of 3 HBAR cap
-        bytes memory tooMuch = _subLeg(agentC, 1e8 + 1, SUBTERMS, 2);
+        _addSub(agentB, 2 ether, 1);                  // 2 of 3 QOR cap
+        bytes memory tooMuch = _subLeg(agentC, 1 ether + 1, SUBTERMS, 2);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.CapExceeded.selector);
-        task.addSubLeg(agentC, 1e8 + 1, SUBTERMS, 2, tooMuch);
-        _addSub(agentC, 1e8, 3);                      // exactly at the cap is fine
+        task.addSubLeg(agentC, 1 ether + 1, SUBTERMS, 2, tooMuch);
+        _addSub(agentC, 1 ether, 3);                      // exactly at the cap is fine
     }
 
     function test_subLegCountLimit() public {
         _fundX402();
-        _addSub(agentB, 1e8, 1);
-        _addSub(agentC, 1e8, 2);
+        _addSub(agentB, 1 ether, 1);
+        _addSub(agentC, 1 ether, 2);
         bytes memory sig = _subLeg(address(0xD0D), 1e7, SUBTERMS, 3);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.TooManyLegs.selector);
@@ -173,54 +173,54 @@ contract TaskEscrowTest is Test {
 
     function test_subLegGuards() public {
         _fundX402();
-        bytes memory good = _subLeg(agentB, 1e8, SUBTERMS, 1);
+        bytes memory good = _subLeg(agentB, 1 ether, SUBTERMS, 1);
         // only the operator
         vm.expectRevert(TaskEscrow.NotAllowed.selector);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 1, good);
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, good);
         // signature for different terms
-        bytes memory other = _subLeg(agentB, 1e8, keccak256("other"), 1);
+        bytes memory other = _subLeg(agentB, 1 ether, keccak256("other"), 1);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.BadSignature.selector);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 1, other);
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, other);
         // A cannot hire itself; zero price
-        bytes memory selfSig = _subLeg(agentA, 1e8, SUBTERMS, 2);
+        bytes memory selfSig = _subLeg(agentA, 1 ether, SUBTERMS, 2);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.BadLeg.selector);
-        task.addSubLeg(agentA, 1e8, SUBTERMS, 2, selfSig);
+        task.addSubLeg(agentA, 1 ether, SUBTERMS, 2, selfSig);
         bytes memory zeroSig = _subLeg(agentB, 0, SUBTERMS, 3);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.BadLeg.selector);
         task.addSubLeg(agentB, 0, SUBTERMS, 3, zeroSig);
         // nonce reuse
         vm.prank(operator);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 1, good);
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, good);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.NonceUsed.selector);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 1, good);
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, good);
     }
 
     function test_noSubLegsBeforeFundingOrAfterRelease() public {
-        bytes memory sig = _subLeg(agentB, 1e8, SUBTERMS, 1);
+        bytes memory sig = _subLeg(agentB, 1 ether, SUBTERMS, 1);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.WrongState.selector);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 1, sig); // not funded yet
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 1, sig); // not funded yet
         _fundX402();
         _submitAndRelease();
-        bytes memory sig2 = _subLeg(agentB, 1e8, SUBTERMS, 2);
+        bytes memory sig2 = _subLeg(agentB, 1 ether, SUBTERMS, 2);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.WrongState.selector);
-        task.addSubLeg(agentB, 1e8, SUBTERMS, 2, sig2); // released
+        task.addSubLeg(agentB, 1 ether, SUBTERMS, 2, sig2); // released
     }
 
     // ---------- A pays B over x402; receipt recorded; default after grace ----------
     function test_owedThenRecordPayout() public {
         _fundX402();
-        uint256 id = _addSub(agentB, 2 * 1e8, 1);
+        uint256 id = _addSub(agentB, 2 ether, 1);
         assertFalse(task.owed(id));          // not owed until the task is released
         _submitAndRelease();
         assertTrue(task.owed(id));
         vm.prank(operator);
-        task.recordPayout(id, "0.0.7162784@1793970887.617954312");
+        task.recordPayout(id, "0x206b8eea0000000000000000000000000000000000000000000000000000c74");
         assertFalse(task.owed(id));
         (, , , TaskEscrow.LegStatus st) = task.leg(id);
         assertEq(uint8(st), uint8(TaskEscrow.LegStatus.Paid));
@@ -228,7 +228,7 @@ contract TaskEscrowTest is Test {
 
     function test_recordPayoutGuards() public {
         _fundX402();
-        uint256 id = _addSub(agentB, 2 * 1e8, 1);
+        uint256 id = _addSub(agentB, 2 ether, 1);
         vm.prank(operator);
         vm.expectRevert(TaskEscrow.WrongState.selector);
         task.recordPayout(id, "tx"); // not released yet
@@ -247,7 +247,7 @@ contract TaskEscrowTest is Test {
 
     function test_defaultAfterGrace_andCannotRecordAfterwards() public {
         _fundX402();
-        uint256 id = _addSub(agentB, 2 * 1e8, 1);
+        uint256 id = _addSub(agentB, 2 ether, 1);
         _submitAndRelease();
         vm.expectRevert(TaskEscrow.TooEarly.selector);
         task.markDefault(id);
@@ -263,7 +263,7 @@ contract TaskEscrowTest is Test {
 
     function test_paidLegCannotBeMarkedDefault() public {
         _fundX402();
-        uint256 id = _addSub(agentB, 2 * 1e8, 1);
+        uint256 id = _addSub(agentB, 2 ether, 1);
         _submitAndRelease();
         vm.prank(operator);
         task.recordPayout(id, "tx");

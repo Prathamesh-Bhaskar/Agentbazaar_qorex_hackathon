@@ -2,19 +2,19 @@
 pragma solidity 0.8.24;
 
 /// @notice ONE contract for a whole task: client -> agent A (root leg 0) and agent A -> agent B (sub-legs, max 2 hops).
-/// The client's HBAR is locked here. After a verified PASS the contract pays A. A then pays each sub-agent B over
-/// Hedera x402 (an account-to-account transfer made outside this contract); the backend records the Hedera
-/// transaction id with recordPayout(). Anything A does not pay within `payoutGrace` is marked Defaulted on-chain.
+/// The client's QOR is locked here. After a verified PASS the contract pays A. A then pays each sub-agent B with a
+/// hybrid-signed (secp256k1 + ML-DSA-87) native QOR transfer made outside this contract; the backend verifies that
+/// transfer on chain and records its transaction hash with recordPayout(). Anything A does not pay within
+/// `payoutGrace` is marked Defaulted on-chain.
 ///
-/// All amounts are TINYBAR (1 HBAR = 1e8), the unit msg.value and address.balance use on Hedera.
-/// Never use `1 ether`: on Hedera that is 1e10 HBAR.
+/// All amounts are in wei (1 QOR = 1e18), the unit msg.value and address.balance use on QoreChain's EVM lane.
 contract TaskEscrow {
     enum State { Created, Funded, Submitted, Released, Refunded }
     enum LegStatus { Pending, Paid, Defaulted }
 
     struct Leg {
         address payable payee; // leg 0: agent A. leg i>0: sub-agent B_i
-        uint256 price;         // tinybar. leg 0 = amount the client locks
+        uint256 price;         // wei. leg 0 = amount the client locks
         bytes32 termsHash;     // hash of the off-chain terms/rationale designed by the Solidity agent
         LegStatus status;
     }
@@ -26,7 +26,7 @@ contract TaskEscrow {
         address operator;      // backend relayer: submits, adds sub-legs, records payouts
         address verifier;      // platform verdict signer
         address designer;      // Solidity agent that designed and deployed this contract
-        uint256 price;         // tinybar, root leg
+        uint256 price;         // wei, root leg
         uint64 deadline;       // unix seconds
         uint16 maxSubBps;      // cap on the sum of sub-leg prices, in basis points of `price`
         uint8 maxSubLegs;
@@ -69,8 +69,8 @@ contract TaskEscrow {
     event Submitted(bytes32 indexed agreementId, bytes32 deliverableHash);
     event Released(bytes32 indexed agreementId, address agent, uint256 amount);
     event Refunded(bytes32 indexed agreementId, address client, uint256 amount);
-    /// @param hederaTxId the x402 settlement transaction id, e.g. "0.0.7162784@1793970887.617954312"
-    event PayoutRecorded(bytes32 indexed agreementId, uint256 legId, address payee, uint256 price, string hederaTxId);
+    /// @param payoutRef the QoreChain transaction hash of A's payment to the sub-agent (hex, as the explorer shows it)
+    event PayoutRecorded(bytes32 indexed agreementId, uint256 legId, address payee, uint256 price, string payoutRef);
     event PayoutDefaulted(bytes32 indexed agreementId, uint256 legId, address debtor, address payee, uint256 price);
 
     error WrongState();
@@ -101,7 +101,7 @@ contract TaskEscrow {
     }
 
     // ---------------- funding ----------------
-    /// @notice Wallet path (MetaMask): the client sends exactly the price.
+    /// @notice Wallet path (QoreX or MetaMask): the client sends exactly the price.
     function fund() external payable {
         if (msg.sender != client) revert NotAllowed();
         if (state != State.Created) revert WrongState();
@@ -177,16 +177,16 @@ contract TaskEscrow {
         _refundClient();
     }
 
-    // ---------------- A pays B over x402 (outside the contract), recorded here ----------------
-    /// @notice The backend verified (on the mirror node) that A paid sub-leg `legId` through x402 and records the receipt.
-    function recordPayout(uint256 legId, string calldata hederaTxId) external {
+    // ---------------- A pays B with a native QOR transfer (outside the contract), recorded here ----------------
+    /// @notice The backend verified on chain that A paid sub-leg `legId` and records the receipt (the payment's tx hash).
+    function recordPayout(uint256 legId, string calldata payoutRef) external {
         if (msg.sender != operator) revert NotAllowed();
         if (state != State.Released) revert WrongState();
         if (legId == 0 || legId >= _legs.length) revert BadLeg();
         Leg storage l = _legs[legId];
         if (l.status != LegStatus.Pending) revert WrongState();
         l.status = LegStatus.Paid;
-        emit PayoutRecorded(agreementId, legId, l.payee, l.price, hederaTxId);
+        emit PayoutRecorded(agreementId, legId, l.payee, l.price, payoutRef);
     }
 
     /// @notice After the grace period A has not paid: mark the debt Defaulted. Anyone may call; feeds A's trust score.

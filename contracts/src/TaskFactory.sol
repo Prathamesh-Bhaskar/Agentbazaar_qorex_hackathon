@@ -41,7 +41,7 @@ contract TaskFactory {
         verifier = _verifier;
     }
 
-    /// @param price tinybar
+    /// @param price wei
     function createTask(
         bytes32 agreementId, address client, address payable agent, uint256 price, uint64 deadline,
         uint16 maxSubBps, uint8 maxSubLegs, uint32 payoutGrace, bytes32 termsHash
