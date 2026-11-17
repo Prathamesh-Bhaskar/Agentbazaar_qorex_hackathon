@@ -28,6 +28,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | Designer and the 5 agent accounts registered their PQC keys the same way (classical signature, code 0) | txs `6C57248E…F0B0`, `DC3C931D…BEF3`, `9468EBBB…2AA9`, `1D383735…EE6A`, `E96B5463…B892`, `8F9D97FA…969F1` |
 | A hybrid-signed `MsgSend` from an agent account works; the REST receipt shows `MsgSend`, sender, recipient, amount and a `PQCHybridSignature` extension (ML-DSA-87) | tx `29CE54CEB6E3B2408B20E71407DA7B302ABCE96B3D40A23535C101BAAD528B8C`, 0.01 QOR, via `EthNativeSigner.bankSend`; receipt read from `cosmos/tx/v1beta1/txs/{hash}` |
 | A larger window replaces the previous one and EVM value transfers count against `maxValue` | window re-opened with 50,000,000 uqor; six transfers (35 QOR) then succeeded |
+| `TaskFactory` (compiled with `evm_version = paris`) deploys and works on chain 9800; roles read back correctly (Q4 answered for the factory, which embeds the full `TaskEscrow` creation code) | `0x83CD43960C3634bfCc63D22C971Aa2f9c8477719`, tx `0xeae17561…2540`, 10,605 bytes of runtime code |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -137,7 +138,7 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
   dApp-side call (wallet-adapter `openEvmWindowMsg`) is untested.
 - **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`).
 - **Q3** Finality and reorg behaviour of the EVM RPC.
-- **Q4** Whether Foundry's `paris` output deploys the real `TaskEscrow` (only a 10-byte contract is tested so far).
+- **Q4** PARTLY ANSWERED 17 Nov: the factory deploys. Still to confirm: a `TaskEscrow` created through it and a full fund/release cycle (step 1.4).
 - **Q5** Rate limits on the public RPC and REST endpoints for the indexer.
 - **Q6** ANSWERED 17 Nov: hybrid `MsgSend` works from an agent account (see section 2). Still to build: the agent-side code in `live-agents` and the backend's receipt check.
 

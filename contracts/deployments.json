@@ -1,13 +1,13 @@
 {
-  "hederaTestnet": {
-    "chainId": 296,
+  "qorechainTestnet": {
+    "chainId": 9800,
     "TaskFactory": {
-      "address": "0x8dc78702127e50cc8f43b936edcc0f8a5e7da8f0",
-      "contractId": "0.0.11339681",
-      "owner": "0x875fc8473b5507E78d60B52b171124a55e3129FC",
-      "designer": "0xe384d1e2276992a507184C1C2Aa02Ed8d62d2778",
-      "operator": "0x875fc8473b5507E78d60B52b171124a55e3129FC",
-      "verifier": "0x2d879491dA59A0F5AA95ef719f3d3c679c08E37F"
+      "address": "0x83CD43960C3634bfCc63D22C971Aa2f9c8477719",
+      "deployTx": "0xeae1756116173ec621002abff40e5256e77c2ec003d099d31f443c99a5d72540",
+      "owner": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3",
+      "designer": "0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9",
+      "operator": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3",
+      "verifier": "0xbF4EbcBB325E4d0e8D0Bc44D3faF8CC70c9610fC"
     }
   }
 }
