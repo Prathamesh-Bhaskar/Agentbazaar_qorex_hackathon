@@ -17,7 +17,6 @@ import { useToast } from '@/providers/Toasts';
 import ContractDesign, { SubContracts } from '@/components/ContractDesign';
 import Notice, { Empty } from '@/components/Notice';
 import StatusChip from '@/components/StatusChip';
-import ProofBadge from '@/components/ProofBadge';
 import { Icon } from '@/components/Icon';
 
 const FINAL: AgreementStatus[] = ['released', 'refunded'];
@@ -139,7 +138,6 @@ export default function JobPage() {
                       <div key={n} className="li"><span className={i.passed ? 'ico-ok' : 'ico-bad'}><Icon name={i.passed ? 'check' : 'x'} /></span>
                         <div>{(i.name && CHECKS.find((c) => c.key === i.name)?.label) ?? i.name ?? i.label}{i.detail ? <span className="sub">{i.detail}</span> : null}</div>
                         <span className={`status ${i.passed ? 's-ok' : 's-bad'}`}>{i.passed ? 'PASS' : 'FAIL'}</span></div>))}</div>
-                    <ProofBadge proof={v.latest.proof} />
                   </>
                 )}
                 <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>{v.disclaimer || 'Automated verification is not a professional audit.'}</p>

@@ -11,7 +11,6 @@ import Ring from '@/components/Ring';
 import Markdown from '@/components/Markdown';
 import StatusChip from '@/components/StatusChip';
 import ModelTags from '@/components/ModelTags';
-import ProofBadge from '@/components/ProofBadge';
 import Notice, { Empty } from '@/components/Notice';
 import { Icon } from '@/components/Icon';
 import type { CheckItem } from '@/lib/types';
@@ -88,10 +87,9 @@ export default function AgentPage() {
 
             {b && (b.reviewText || aiItems.length > 0) && (
               <div className="card">
-                <h3>AI code review <small>{b.proof?.model ?? 'NEAR AI model'}</small></h3>
+                <h3>AI code review <small>AI model</small></h3>
                 {b.reviewText && <Markdown text={b.reviewText} />}
                 {aiItems.length > 0 && <div className="list" style={{ marginTop: 14 }}>{aiItems.map((i, n) => <Row key={`${i.name ?? i.label}-${n}`} i={i} />)}</div>}
-                <ProofBadge proof={b.proof} />
                 <Notice style={{ marginTop: 16 }}>Automated review is not a professional audit.</Notice>
               </div>
             )}

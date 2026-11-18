@@ -772,17 +772,13 @@ main{overflow-x:clip}
 @media(min-width:700px){.lp-econ{grid-template-columns:repeat(2,1fr)}.lp-econ>div:nth-child(2){border-top:0}.lp-econ>div:nth-child(even){border-left:1px solid var(--border)}}
 @media(min-width:1000px){.lp-econ{grid-template-columns:repeat(4,1fr)}.lp-econ>div{border-top:0;border-left:1px solid var(--border)}.lp-econ>div:first-child{border-left:0}}
 
-/* ---------- NEAR AI highlight (hero) and "how it works" section ---------- */
+/* ---------- verification highlight (hero) and "how it works" section ---------- */
 .lp-pillars{margin-top:20px}
-.lp-nearsec .lp-steps{margin-bottom:44px}
+.lp-aisec .lp-steps{margin-bottom:44px}
 .lp-h3{font-size:20px;font-weight:600;margin:0 0 16px}
-.lp-near-proof{display:grid;gap:14px;grid-template-columns:1fr;margin-top:28px}
-@media(min-width:800px){.lp-near-proof{grid-template-columns:repeat(3,1fr)}}
-.lp-near-proof>div{border:1px solid var(--border);background:var(--bg);padding:16px 18px}
-.lp-near-proof p{font-size:13.5px;line-height:1.55;color:var(--muted-60);margin-top:10px}
-.lp-nearsec .lp-fine{margin-top:20px;max-width:760px}
+.lp-aisec .lp-fine{margin-top:20px;max-width:760px}
 
-/* ================= NEAR AI look: neutral base, one blue accent, mono labels, square tiles ================= */
+/* ================= Design look: neutral base, one blue accent, mono labels, square tiles ================= */
 .eyebrow-p,.page-head p.eyebrow-p,.lp-pillar .k,.lp-eyebrow{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.12em;text-transform:uppercase}
 .eyebrow-p{color:var(--primary);margin-bottom:14px}
 .lp-eyebrow{color:var(--muted);border-style:dashed;padding:7px 14px}
@@ -806,15 +802,15 @@ main{overflow-x:clip}
 .lp-pillar{background:var(--surface);border-top-width:2px}
 .lp-pillar .lp-ico{margin-bottom:4px}
 
-/* NEAR AI hero panel */
-.lp-near{display:grid;grid-template-columns:1fr;gap:22px;margin-top:44px;border:1px solid var(--primary-25);background:linear-gradient(135deg,var(--primary-10),transparent 60%),var(--surface);padding:24px}
-.lp-near:hover{border-color:var(--primary)}
-@media(min-width:960px){.lp-near{grid-template-columns:1.1fr .9fr;gap:28px 36px;padding:30px}.lp-near-grid{grid-column:1/-1}}
-.lp-near-main{display:flex;flex-direction:column;align-items:flex-start;gap:14px;justify-content:center}
-.lp-near-badge{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;background:var(--primary);color:var(--on-primary);padding:5px 10px;border-radius:var(--radius-ctl)}
-.lp-near-main h2{font-size:clamp(20px,2.4vw,28px);font-weight:600;line-height:1.2;letter-spacing:-.02em;text-wrap:balance}
-.lp-near-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--primary)}
-.lp-near-link svg{width:16px;height:16px}
+/* verification hero panel */
+.lp-ai{display:grid;grid-template-columns:1fr;gap:22px;margin-top:44px;border:1px solid var(--primary-25);background:linear-gradient(135deg,var(--primary-10),transparent 60%),var(--surface);padding:24px}
+.lp-ai:hover{border-color:var(--primary)}
+@media(min-width:960px){.lp-ai{grid-template-columns:1.1fr .9fr;gap:28px 36px;padding:30px}.lp-ai-grid{grid-column:1/-1}}
+.lp-ai-main{display:flex;flex-direction:column;align-items:flex-start;gap:14px;justify-content:center}
+.lp-ai-badge{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;background:var(--primary);color:var(--on-primary);padding:5px 10px;border-radius:var(--radius-ctl)}
+.lp-ai-main h2{font-size:clamp(20px,2.4vw,28px);font-weight:600;line-height:1.2;letter-spacing:-.02em;text-wrap:balance}
+.lp-ai-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--primary)}
+.lp-ai-link svg{width:16px;height:16px}
 .lp-term{border:1px solid var(--border-2);background:var(--code-bg);font-family:var(--mono);font-size:12.5px;overflow:hidden}
 .lp-term-bar{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted-60)}
 .lp-term-bar i{width:8px;height:8px;border-radius:50%;background:var(--border-2)}
@@ -825,15 +821,15 @@ main{overflow-x:clip}
 .lp-term em{font-style:normal;color:var(--primary);width:14px;flex:none}
 .lp-term b{color:var(--fg);font-weight:500}
 .lp-term li.ok,.lp-term li.ok em{color:var(--ok)}
-.lp-near-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border-top:1px solid var(--primary-25);padding-top:18px}
-@media(min-width:900px){.lp-near-grid{grid-template-columns:repeat(4,1fr)}}
-.lp-near-grid>div{display:flex;flex-direction:column;gap:3px;padding:6px 18px 6px 0}
-.lp-near-grid>div+div{padding-left:18px}
-@media(max-width:899px){.lp-near-grid>div:nth-child(odd){padding-left:0}.lp-near-grid>div:nth-child(n+3){padding-top:16px}}
-@media(min-width:900px){.lp-near-grid>div+div{border-left:1px solid var(--border)}}
-.lp-near-grid strong{font-family:var(--display);font-size:clamp(26px,3vw,36px);font-weight:600;letter-spacing:-.02em;color:var(--primary);line-height:1.1}
-.lp-near-grid b{font-size:14px;font-weight:600;color:var(--fg);min-width:0}
-.lp-near-grid span{font-size:13px;line-height:1.5;color:var(--muted-60)}
+.lp-ai-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border-top:1px solid var(--primary-25);padding-top:18px}
+@media(min-width:900px){.lp-ai-grid{grid-template-columns:repeat(4,1fr)}}
+.lp-ai-grid>div{display:flex;flex-direction:column;gap:3px;padding:6px 18px 6px 0}
+.lp-ai-grid>div+div{padding-left:18px}
+@media(max-width:899px){.lp-ai-grid>div:nth-child(odd){padding-left:0}.lp-ai-grid>div:nth-child(n+3){padding-top:16px}}
+@media(min-width:900px){.lp-ai-grid>div+div{border-left:1px solid var(--border)}}
+.lp-ai-grid strong{font-family:var(--display);font-size:clamp(26px,3vw,36px);font-weight:600;letter-spacing:-.02em;color:var(--primary);line-height:1.1}
+.lp-ai-grid b{font-size:14px;font-weight:600;color:var(--fg);min-width:0}
+.lp-ai-grid span{font-size:13px;line-height:1.5;color:var(--muted-60)}
 @media(prefers-reduced-motion:reduce){.lp-term li{opacity:1;animation:none}}
 
 /* marquee strip (hackathon-site style) */

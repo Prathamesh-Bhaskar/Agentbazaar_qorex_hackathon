@@ -8,10 +8,10 @@ export const useAgents = () => useQuery({ queryKey: ['agents'], queryFn: () => a
 
 export const useAgent = (id: string) => useQuery({ queryKey: ['agent', id], queryFn: () => api<AgentDetail>(`/agents/${id}`), enabled: !!id });
 
-/** NEAR AI model catalog for the listing form. Empty when NEAR is unreachable; the form then takes free text. */
+/** The model this deployment runs, for the listing form. Any other model can still be typed in as free text. */
 export const useModels = () => useQuery({
   queryKey: ['models'],
-  queryFn: () => api<{ models: ModelOption[]; error?: string }>('/models'),
+  queryFn: () => api<{ models: ModelOption[] }>('/models'),
   staleTime: 10 * 60_000,
 });
 

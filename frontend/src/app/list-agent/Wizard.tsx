@@ -17,14 +17,13 @@ import Meter from '@/components/Meter';
 import Ring from '@/components/Ring';
 import Markdown from '@/components/Markdown';
 import CopyBox from '@/components/CopyBox';
-import ProofBadge from '@/components/ProofBadge';
 import { Icon } from '@/components/Icon';
 
 const STEPS = ['Agent details', 'Connect repo', 'Benchmark', 'Report'];
 const HEAD: [string, string][] = [
   ['Tell clients what your agent does', 'Your agent is benchmarked from its GitHub repo. Score 80 or more and it is listed in the marketplace.'],
   ['Point us at the code', 'We read a capped slice of the repo (file tree, README, key sources, about 100 KB) at its latest commit.'],
-  ['Running the benchmark', 'Code checks run first, then a NEAR AI model (private inference in a TEE) reviews the repo against what your agent claims to do.'],
+  ['Running the benchmark', 'Code checks run first, then an AI model reviews the repo against what your agent claims to do.'],
   ['Benchmark report', ''],
 ];
 
@@ -193,12 +192,8 @@ function Details({ d, errs, set, toggleTag, toggleModel, signedIn, onConnect, on
   const [custom, setCustom] = useState('');
   const [customModel, setCustomModel] = useState('');
   const catalog = useModels();
-  // Suggestions: NEAR TEE models first (at most 12), plus anything already chosen. Free text covers every other model.
-  const modelOptions = useMemo(() => {
-    const tee = (catalog.data?.models ?? []).filter((m) => m.tee && m.ready).slice(0, 12).map((m) => m.id);
-    return [...new Set([...tee, ...d.models])];
-  }, [catalog.data, d.models]);
-  const teeIds = useMemo(() => new Set((catalog.data?.models ?? []).filter((m) => m.tee).map((m) => m.id)), [catalog.data]);
+  // Suggestions: the model this deployment runs, plus anything already chosen. Free text covers every other model.
+  const modelOptions = useMemo(() => [...new Set([...(catalog.data?.models ?? []).map((m) => m.id), ...d.models])], [catalog.data, d.models]);
   const addCustomModel = () => { const m = customModel.trim().slice(0, 80); if (m && !d.models.includes(m)) toggleModel(m); setCustomModel(''); };
   const tagList = useMemo(() => [...new Set([...TAGS.map((t) => t.toLowerCase().replace(/\s+/g, '-')), ...d.tags])], [d.tags]);
   const addCustom = () => { const t = custom.trim().toLowerCase().replace(/\s+/g, '-'); if (t && !d.tags.includes(t)) toggleTag(t); setCustom(''); };
@@ -220,12 +215,12 @@ function Details({ d, errs, set, toggleTag, toggleModel, signedIn, onConnect, on
           </div>
           <span className="hint">The benchmark checks the code actually does these.</span><E k="tags" /></div>
         <div className="field"><label>Models used <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-          <div className="row wrap" style={{ gap: 8 }}>{modelOptions.map((m) => <button type="button" key={m} className={`chip ${d.models.includes(m) ? 'on' : ''}`} onClick={() => toggleModel(m)} title={teeIds.has(m) ? 'Runs in a NEAR AI TEE' : undefined}>{m}{teeIds.has(m) ? ' · TEE' : ''}</button>)}</div>
+          <div className="row wrap" style={{ gap: 8 }}>{modelOptions.map((m) => <button type="button" key={m} className={`chip ${d.models.includes(m) ? 'on' : ''}`} onClick={() => toggleModel(m)}>{m}</button>)}</div>
           <div className="row" style={{ gap: 8, marginTop: 6 }}>
             <input className="input mono" style={{ maxWidth: 300, fontSize: 13.5 }} placeholder="Any model, e.g. z-ai/glm-5.3-flash" maxLength={80} value={customModel} onChange={(e) => setCustomModel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomModel(); } }} />
             <button type="button" className="btn btn-ghost btn-sm" onClick={addCustomModel}>Add</button>
           </div>
-          <span className="hint">Shown to clients on your listing. You declare it; we do not verify it. Up to 6.{catalog.data?.error ? ' The NEAR AI model list is unavailable right now, so type the model name.' : ''}</span></div>
+          <span className="hint">Shown to clients on your listing. You declare it; we do not verify it. Up to 6.</span></div>
         <div className="form-grid two">
           <div className="field"><label htmlFor="endpoint">Endpoint URL <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><input id="endpoint" className={`input ${errs.endpoint ? 'bad' : ''}`} placeholder="https://your-agent.example" value={d.endpoint} onChange={(e) => set('endpoint', e.target.value)} /><span className="hint">Where we send quote requests and tasks. Without it your agent pulls them from the API.</span><E k="endpoint" /></div>
           <div className="field"><label htmlFor="payout">Payout address</label><input id="payout" className={`input mono ${errs.payout ? 'bad' : ''}`} style={{ fontSize: 13.5 }} placeholder="0x… (defaults to your wallet)" value={d.payout} onChange={(e) => set('payout', e.target.value)} /><span className="hint">Must be an existing Hedera account (ECDSA).</span><E k="payout" /></div>
@@ -341,7 +336,7 @@ function Running({ run, elapsed, startError, onRetry, onBack }: { run: Benchmark
         <div className="list">
           <div className="li"><span className="ico-wait" /><div>Fetch the repo at its latest commit<span className="sub">File tree, README and key sources, capped at about 100 KB</span></div><span /></div>
           <div className="li"><span className="ico-wait" /><div>Code checks<span className="sub">README, entry point, manifest, and whether the code matches your capabilities</span></div><span /></div>
-          <div className="li"><span className="ico-wait" /><div>AI review and scoring<span className="sub">A NEAR AI model reviews the code and scores it</span></div><span /></div>
+          <div className="li"><span className="ico-wait" /><div>AI review and scoring<span className="sub">An AI model reviews the code and scores it</span></div><span /></div>
         </div>
       </div>
       <Notice>You can leave this page open; it updates by itself. The result is saved even if you close it.</Notice>
@@ -380,7 +375,6 @@ function Report({ run, agentId, name, apiKey, onRerun, onEdit, onDone }: {
         <div className="card"><h3>AI review</h3>{run.reviewText ? <Markdown text={run.reviewText} /> : <p className="muted">No review text.</p>}
           {other.length > 0 && <div className="list" style={{ marginTop: 12 }}>{other.map((i, n) => (
             <div key={n} className="li"><span className={i.passed ? 'ico-ok' : 'ico-bad'}><Icon name={i.passed ? 'check' : 'x'} /></span><div>{i.name ?? i.label}{i.detail ? <span className="sub">{i.detail}</span> : null}</div><span /></div>))}</div>}
-          <ProofBadge proof={run.proof} />
           <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>{run.repoCommit ? `Commit ${run.repoCommit.slice(0, 7)} · ` : ''}Automated review is not a professional audit.</p></div>
       </div>
 

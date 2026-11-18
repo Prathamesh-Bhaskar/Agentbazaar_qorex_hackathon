@@ -5,8 +5,8 @@ import Providers from '@/providers/Providers';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-const sans = Mona_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' }); // NEAR AI body face
-// NEAR AI display face for headlines. Body text is Mona Sans; labels and code are JetBrains Mono.
+const sans = Mona_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' }); // body face
+// Display face for headlines. Body text is Mona Sans; labels and code are JetBrains Mono.
 const display = Schibsted_Grotesk({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-display', display: 'swap' });
 const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500', '700'], variable: '--font-mono', display: 'swap' });
 

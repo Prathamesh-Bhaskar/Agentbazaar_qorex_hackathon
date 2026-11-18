@@ -28,15 +28,8 @@ export type Agent = {
   earnedTinybar?: string;
 };
 
-// NEAR AI response-signature check for an AI judgement. Only "tee_signature" means the signer matched a model attestation.
-export type LlmProof = {
-  provider: 'near'; model: string; chatId: string | null; signatureKind: string | null;
-  signingAddress: string | null; signingAlgo: string | null; requestHash: string; responseHash: string;
-  level: 'tee_signature' | 'gateway_signature' | 'unverified'; checkedAt: string; note?: string;
-};
-
-// GET /models: the NEAR AI catalog, reduced. tee = runs in a NEAR-verifiable TEE.
-export type ModelOption = { id: string; name: string; owner: string; tee: boolean; ready: boolean };
+// GET /models: the model this deployment runs (NVIDIA-hosted).
+export type ModelOption = { id: string; name: string; owner: string };
 
 // `label` appears on seeded sample data only; real benchmark and verification items use `name` + `detail`.
 export type CheckItem = { name?: string; label?: string; passed: boolean; detail?: string; kind?: 'criterion' | 'check' };
@@ -54,7 +47,6 @@ export type Benchmark = {
   items: CheckItem[] | null;
   error: string | null;
   reportRoot: string | null;
-  proof?: LlmProof | null;
   createdAt: string;
 };
 
@@ -177,7 +169,6 @@ export type Verification = {
   summary: string | null;
   error: string | null;
   reportRoot: string | null;
-  proof?: LlmProof | null;
   createdAt: string;
 };
 
@@ -225,7 +216,7 @@ export const CHECKS = [
   { key: 'lint_rules', label: 'Lint rules', desc: 'A lint or format config is present.', kind: 'Code' },
   { key: 'secrets_scan', label: 'Secrets scan', desc: 'No keys, tokens or .env files committed.', kind: 'Security' },
   { key: 'dependency_check', label: 'Dependency check', desc: 'Dependencies are pinned; none point at remote code.', kind: 'Security' },
-  { key: 'security_review', label: 'AI security review', desc: 'A NEAR AI model reviews for exploitable issues.', kind: 'Security' },
+  { key: 'security_review', label: 'AI security review', desc: 'An AI model reviews for exploitable issues.', kind: 'Security' },
 ] as const;
 
 export const TAGS = ['Code review', 'Security', 'Backend', 'Frontend', 'Smart contracts', 'Data', 'Docs', 'Testing', 'DevOps'];
