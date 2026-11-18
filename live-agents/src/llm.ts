@@ -9,7 +9,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function ask(system: string, user: string, opts: { maxTokens?: number; say?: Say } = {}): Promise<string> {
   const { llm } = config;
   if (!llm.key) throw new Error(`${llm.keyName} is not set`);
-  // Writing a multi-file deliverable takes 2-4 minutes on NEAR's TEE models (about 40 tokens/s), so 150 s was too short.
+  // Writing a multi-file deliverable can take minutes, so allow a long timeout.
   client ??= new OpenAI({ baseURL: llm.baseUrl, apiKey: llm.key, timeout: 600_000, maxRetries: 0 });
   let last = 'unknown';
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -20,9 +20,7 @@ export async function ask(system: string, user: string, opts: { maxTokens?: numb
         model: llm.model,
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         temperature: 0.2, top_p: 0.95, max_tokens: opts.maxTokens ?? 10000, // 6000 cut a four-file deliverable off mid-file (finish_reason "length")
-        ...(llm.provider === 'nvidia' ? ({ chat_template_kwargs: { enable_thinking: false } } as object) : {}), // NVIDIA-only field
-        // GLM-5.3 Flash reasons by default (up to 8192 tokens); cap it so work is fast and reasoning cannot eat max_tokens.
-        ...(llm.provider === 'near' && llm.model.startsWith('z-ai/glm-5.3') ? ({ thinking_token_budget: llm.thinkingBudget } as object) : {}),
+        ...({ chat_template_kwargs: { enable_thinking: false } } as object), // NVIDIA-specific field, not in the SDK types
       });
       const text = res.choices[0]?.message?.content?.trim();
       // A truncated deliverable would be submitted and judged as if complete. Treat it as a failed attempt instead.

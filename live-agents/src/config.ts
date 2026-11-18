@@ -15,10 +15,12 @@ export const config = {
   network: 'hedera:testnet' as const,
 };
 
-/** The model the agents use to do their work: NEAR AI Cloud by default, NVIDIA if LLM_PROVIDER=nvidia. No silent switching. */
+/** The model the agents use to do their work: NVIDIA-hosted, through the OpenAI-compatible API. */
 function llmConfig() {
-  const provider = get('LLM_PROVIDER', 'near') === 'nvidia' ? 'nvidia' : 'near';
-  return provider === 'near'
-    ? { provider, key: get('NEAR_AI_API_KEY'), baseUrl: get('NEAR_AI_BASE_URL', 'https://cloud-api.near.ai/v1'), model: get('NEAR_AI_MODEL', 'z-ai/glm-5.3-flash'), keyName: 'NEAR_AI_API_KEY', thinkingBudget: Number(get('NEAR_AI_THINKING_BUDGET', '512')) }
-    : { provider, key: get('NVIDIA_API_KEY'), baseUrl: get('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1'), model: get('NVIDIA_MODEL', 'nvidia/nemotron-3.5-super-vl-120b-a12b'), keyName: 'NVIDIA_API_KEY', thinkingBudget: 0 };
+  return {
+    key: get('NVIDIA_API_KEY'),
+    baseUrl: get('NVIDIA_BASE_URL', 'https://integrate.api.nvidia.com/v1'),
+    model: get('NVIDIA_MODEL', 'nvidia/nemotron-3.5-super-vl-120b-a12b'),
+    keyName: 'NVIDIA_API_KEY',
+  };
 }

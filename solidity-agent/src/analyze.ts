@@ -1,4 +1,4 @@
-// Requirement analysis with the configured model: NEAR AI Cloud by default (OpenAI-compatible API), NVIDIA if LLM_PROVIDER=nvidia. Any failure falls back to a heuristic, flagged in the spec.
+// Requirement analysis with an NVIDIA-hosted model (OpenAI-compatible API). Any failure falls back to a heuristic, flagged in the spec.
 import OpenAI from 'openai';
 import { env } from './env.js';
 import { analysisSchema, heuristicAnalysis, ALLOWED_CHECKS, type Analysis } from './spec.js';
@@ -27,13 +27,12 @@ export type AnalyzeInput = { requirements: string; agentName: string; agentDescr
 export type Analyzer = (input: AnalyzeInput) => Promise<{ analysis: Analysis; source: 'ai' | 'fallback' }>;
 
 export const analyzeWithModel: Analyzer = async (input) => {
-  const near = env.LLM_PROVIDER === 'near';
-  const apiKey = near ? env.NEAR_AI_API_KEY : env.NVIDIA_API_KEY;
+  const apiKey = env.NVIDIA_API_KEY;
   if (!apiKey) return { analysis: heuristicAnalysis(input.requirements), source: 'fallback' };
   try {
-    const client = new OpenAI({ baseURL: near ? env.NEAR_AI_BASE_URL : env.NVIDIA_BASE_URL, apiKey, timeout: 90_000 });
+    const client = new OpenAI({ baseURL: env.NVIDIA_BASE_URL, apiKey, timeout: 90_000 });
     const res = await client.chat.completions.create({
-      model: near ? env.NEAR_AI_MODEL : env.NVIDIA_MODEL,
+      model: env.NVIDIA_MODEL,
       messages: [
         {
           role: 'system',
@@ -46,10 +45,9 @@ export const analyzeWithModel: Analyzer = async (input) => {
         { role: 'user', content: `<data>\nProvider: ${input.agentName} (${input.capabilities.join(', ')}): ${input.agentDescription}\n\nClient requirement:\n${input.requirements}\n</data>` },
       ],
       temperature: 0.2,
-      max_tokens: 3072, // must exceed the reasoning budget (default 1024) or thinking can use it all and leave an empty answer
+      max_tokens: 3072,
       seed: 42,
-      ...(near ? {} : ({ chat_template_kwargs: { enable_thinking: false } } as object)), // NVIDIA-only field
-      ...(near && env.NEAR_AI_MODEL.startsWith('z-ai/glm-5.3') ? ({ thinking_token_budget: env.NEAR_AI_THINKING_BUDGET } as object) : {}),
+      ...({ chat_template_kwargs: { enable_thinking: false } } as object), // NVIDIA-specific field, not in the SDK types
     });
     const analysis = analysisSchema.parse(extractJson(res.choices[0]?.message?.content ?? ''));
     return { analysis, source: 'ai' };

@@ -15,7 +15,7 @@ export async function buildServer() {
     return reply.code(status).send({ error: (err as Error).message });
   });
 
-  app.get('/health', async () => ({ ok: true, agent: 'solidity-agent', aiConfigured: Boolean(env.LLM_PROVIDER === 'near' ? env.NEAR_AI_API_KEY : env.NVIDIA_API_KEY), designer: env.DESIGNER_PRIVATE_KEY ? designerAddress() : null }));
+  app.get('/health', async () => ({ ok: true, agent: 'solidity-agent', aiConfigured: Boolean(env.NVIDIA_API_KEY), designer: env.DESIGNER_PRIVATE_KEY ? designerAddress() : null }));
 
   // Design the terms for one task. No chain access, no side effects.
   app.post('/design', async (req) => {

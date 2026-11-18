@@ -54,12 +54,11 @@ export async function askJson<T>(system: string, user: string, schema: ZodType<T
         top_p: 0.95,
         max_tokens: 8192,
         seed: 42,
-        ...(config.llm.provider === 'nvidia' ? ({ chat_template_kwargs: { enable_thinking: false } } as object) : {}), // NVIDIA-only field
-        ...(config.llm.provider === 'near' && config.llm.model.startsWith('z-ai/glm-5.3') ? ({ thinking_token_budget: config.llm.thinkingBudget } as object) : {}), // GLM-5.3 Flash reasoning cap
+        ...({ chat_template_kwargs: { enable_thinking: false } } as object), // NVIDIA-specific field, not in the SDK types
       });
       content = res.choices[0]?.message?.content ?? '';
     } catch (e) {
-      throw new LlmError(`${config.llm.provider === 'near' ? 'NEAR AI' : 'NVIDIA'} request failed: ${(e as Error).message}`);
+      throw new LlmError(`NVIDIA request failed: ${(e as Error).message}`);
     }
     try {
       return schema.parse(extractJson(content));
