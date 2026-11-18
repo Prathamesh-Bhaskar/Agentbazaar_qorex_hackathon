@@ -17,8 +17,11 @@
   },
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "^1.2.13",
+    "@cosmjs/stargate": "^0.38.1",
     "@fastify/cors": "^11.4.1",
     "@hiero-ledger/sdk": "^2.90.1",
+    "@qorechain/evm": "^0.14.0",
+    "@qorechain/sdk": "^0.14.0",
     "@x402/core": "^2.30.0",
     "@x402/express": "^2.30.0",
     "@x402/fetch": "^2.30.0",
