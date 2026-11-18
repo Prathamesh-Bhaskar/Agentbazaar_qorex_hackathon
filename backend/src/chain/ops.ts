@@ -7,7 +7,7 @@ import { env } from '../env.js';
 import { buildAgentStats } from '../designer/dossier.js';
 import { agentHeaders } from '../agents/dispatch.js';
 import { requestDeploy, requestDesign } from '../designer/client.js';
-import { accountIdOf, contractIdOf } from './mirror.js';
+import { evmToQor } from '@qorechain/sdk';
 import {
   addSubLegOnChain, ChainError, readEscrowState, readTaskTerms, refundOnChain, releaseOnChain, retryIdempotent, signSubLeg, signVerdict, submitOnChain,
 } from './client.js';
@@ -45,15 +45,14 @@ export async function loadDesignInputs(quoteId: string) {
 export async function ensureTask(agreementId: string): Promise<string> {
   const [agreement] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, agreementId)).limit(1);
   if (!agreement) throw new ChainError('Agreement not found');
-  if (agreement.escrowAddress && agreement.taskAccountId) return agreement.escrowAddress;
+  if (agreement.escrowAddress) return agreement.escrowAddress;
 
   const { agent, client, designInput } = await loadDesignInputs(agreement.quoteId);
   const design = await requestDesign(designInput);
   const deployed = await requestDeploy({ agreementId, client: client.address, agent: agent.payoutAddress, spec: design.spec });
   const task = deployed.task.toLowerCase();
-  const taskAccountId = await contractIdOf(task);
 
-  await db.update(schema.agreements).set({ escrowAddress: task, taskAccountId }).where(eq(schema.agreements.id, agreementId));
+  await db.update(schema.agreements).set({ escrowAddress: task }).where(eq(schema.agreements.id, agreementId));
   const existing = await db.select({ id: schema.contractSpecs.id }).from(schema.contractSpecs).where(eq(schema.contractSpecs.agreementId, agreementId)).limit(1);
   if (!existing.length) {
     await db.insert(schema.contractSpecs).values({
@@ -146,7 +145,8 @@ export async function createSubLeg(args: { agreementId: string; calleeAgentId: s
     termsHash = keccak256(toBytes(JSON.stringify(spec)));
   }
 
-  const payeeAccountId = await accountIdOf(callee.payoutAddress);
+  // The payee's native address (qor1...): agent A pays it with a native QOR transfer after release. The column name is a leftover.
+  const payeeAccountId = evmToQor(callee.payoutAddress);
   // If the relay times out but the leg was added, the contract's leg count tells us, so we never add the same hire twice.
   const legsBefore = t.subLegCount + 1;
   const added = await retryIdempotent(async () => {

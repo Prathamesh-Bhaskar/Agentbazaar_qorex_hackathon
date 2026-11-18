@@ -34,6 +34,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | Verifier key rotated on 18 Nov (the old key was shown in a tool output); factory `setRoles` updated | tx `0x501b4d4bebe122740e8c47be91f36624dd0aa9f5ed5ef900e6eda32ce8036fe7` |
 | A send that reverts on chain is charged against the window at its full gas limit x price (300,000 gas -> 33,750 uqor), not gas used; successful sends are charged gas used x price (55,330 gas -> 6,640 uqor) | window counters read before and after on 18 Nov |
 | Window manager behaviour (step 2.3): a healthy window is not re-opened; `ensureWindow(..., force)` opens one with the env sizing (200 txs, 5,000,000 uqor); a real operator send consumed 1 tx | `backend/src/chain/window.ts`, live run 18 Nov |
+| `eth_getLogs` refuses ranges of 10,000 blocks or more (`maximum [from, to] blocks distance: 10000`); chunked reads of 5,000 blocks decode `Funded` (1 QOR), `Submitted`, `Released` (1 QOR) for the smoke task at blocks 10,270,308 / 10,270,310 / 10,270,312 | live run 18 Nov, `backend/src/chain/logs.ts` |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -144,7 +145,7 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 - **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`).
 - **Q3** Finality and reorg behaviour of the EVM RPC.
 - **Q4** ANSWERED 18 Nov: the factory and a `TaskEscrow` created through it work, including fund, submit and release.
-- **Q5** Rate limits on the public RPC and REST endpoints for the indexer.
+- **Q5** PARTLY ANSWERED 18 Nov: getLogs range is limited to under 10,000 blocks (indexer chunks at 5,000). Request-rate limits are still unknown.
 - **Q6** ANSWERED 17 Nov: hybrid `MsgSend` works from an agent account (see section 2). Still to build: the agent-side code in `live-agents` and the backend's receipt check.
 
 ## 7. Plan (15 days; today is 17 Nov)

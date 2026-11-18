@@ -1,28 +1,24 @@
-// Mirror-node indexer. Reads each active task contract's logs and updates money states from the on-chain events.
-// Mirror node, not Hashio (rate limits). Log filtering by topic would need a timestamp range <= 7 days; we filter by timestamp only.
+// Event indexer. Reads each active task contract's logs from the EVM RPC and updates money states from the on-chain events
+// (SPEC-qorechain R5). The RPC allows fewer than 10,000 blocks per getLogs call, so each contract is scanned in chunks from a
+// stored block cursor. chain_cursor.last_consensus_ts holds the last fully scanned BLOCK NUMBER (the column name is a leftover).
 import { and, eq, inArray } from 'drizzle-orm';
-import { decodeEventLog, type Address, type Hex } from 'viem';
+import type { Address, Hex } from 'viem';
 import { db, schema } from '../db/index.js';
 import { env } from '../env.js';
-import { taskEscrowAbi } from './abi.js';
-import { markDefaultOnChain, readTaskTerms } from './client.js';
+import { markDefaultOnChain, publicClient, readTaskTerms } from './client.js';
+import { blockRanges, fetchTaskLogs } from './logs.js';
 import { legNotFailed, notifyPayoutsDue } from './ops.js';
 import { dispatchTask } from '../agents/dispatch.js';
 
-type MirrorLog = { address: string; data: string; topics: string[]; timestamp: string; transaction_hash: string; index: number };
-
-async function fetchLogs(address: string, afterTs: string): Promise<MirrorLog[]> {
-  const out: MirrorLog[] = [];
-  let url: string | null = `${env.HEDERA_MIRROR_URL}/api/v1/contracts/${address}/results/logs?order=asc&limit=100&timestamp=gt:${afterTs}`;
-  for (let page = 0; url && page < 20; page++) {
-    const res: Response = await fetch(url, { headers: { accept: 'application/json' } });
-    if (res.status === 404) return out; // contract not yet visible on the mirror node
-    if (!res.ok) throw new Error(`mirror node ${res.status}`);
-    const body = (await res.json()) as { logs: MirrorLog[]; links?: { next?: string | null } };
-    out.push(...body.logs);
-    url = body.links?.next ? `${env.HEDERA_MIRROR_URL}${body.links.next}` : null;
+/** Where to start scanning a contract that has no cursor yet: the block of the transaction that created it. */
+async function startBlock(agreementId: string): Promise<bigint> {
+  const [spec] = await db.select({ deployTx: schema.contractSpecs.deployTx }).from(schema.contractSpecs)
+    .where(and(eq(schema.contractSpecs.agreementId, agreementId), eq(schema.contractSpecs.kind, 'root'))).limit(1);
+  if (spec?.deployTx) {
+    try { return (await publicClient.getTransactionReceipt({ hash: spec.deployTx as Hex })).blockNumber; } catch { /* fall back below */ }
   }
-  return out;
+  const head = await publicClient.getBlockNumber();
+  return head > 20_000n ? head - 20_000n : 0n; // events older than that would be missed; the deploy tx is normally known
 }
 
 type Agreement = typeof schema.agreements.$inferSelect;
@@ -31,7 +27,7 @@ async function applyEvent(agreement: Agreement, eventName: string, args: Record<
   switch (eventName) {
     case 'Funded': {
       await db.update(schema.agreements).set({ status: 'funded' }).where(and(eq(schema.agreements.id, agreement.id), eq(schema.agreements.status, 'agreed')));
-      // Complete the pending x402 funding row if the gateway created one; otherwise (wallet fund()) insert it.
+      // Complete a pending funding row if one exists; otherwise (the usual wallet fund() path) insert it.
       const done = await db.update(schema.payments)
         .set({ status: 'confirmed', amountTinybar: String(args.amount), txHash })
         .where(and(eq(schema.payments.agreementId, agreement.id), eq(schema.payments.kind, 'fund'), eq(schema.payments.status, 'pending')))
@@ -52,12 +48,12 @@ async function applyEvent(agreement: Agreement, eventName: string, args: Record<
         .where(and(eq(schema.payments.agreementId, agreement.id), eq(schema.payments.kind, kind), eq(schema.payments.status, 'pending')))
         .returning({ id: schema.payments.id });
       if (updated.length === 0) await db.insert(schema.payments).values({ agreementId: agreement.id, kind, amountTinybar: String(args.amount), txHash, status: 'confirmed' });
-      // A has been paid by the contract; tell it who it now owes and where to pay (over x402).
+      // A has been paid by the contract; tell it who it now owes and where to pay.
       if (released) void notifyPayoutsDue(agreement.id);
       break;
     }
     case 'PayoutRecorded':
-      await db.update(schema.subLegs).set({ status: 'paid', payoutTx: String(args.hederaTxId) })
+      await db.update(schema.subLegs).set({ status: 'paid', payoutTx: String(args.payoutRef) })
         .where(and(eq(schema.subLegs.agreementId, agreement.id), eq(schema.subLegs.legId, Number(args.legId))));
       break;
     case 'PayoutDefaulted':
@@ -70,27 +66,25 @@ async function applyEvent(agreement: Agreement, eventName: string, args: Record<
 }
 
 async function indexTask(agreement: Agreement) {
-  const address = agreement.escrowAddress!;
+  const address = agreement.escrowAddress as Address;
   const [cursor] = await db.select().from(schema.chainCursor).where(eq(schema.chainCursor.contract, address)).limit(1);
-  const logs = await fetchLogs(address, cursor?.lastConsensusTs ?? '0');
-  let last = cursor?.lastConsensusTs ?? '0';
-  for (const log of logs) {
-    let decoded: { eventName: string; args: Record<string, unknown> };
-    try {
-      decoded = decodeEventLog({ abi: taskEscrowAbi, data: log.data as Hex, topics: log.topics as [Hex, ...Hex[]] }) as never;
-    } catch {
-      continue; // not one of our events
+  const head = await publicClient.getBlockNumber();
+  const safeHead = head - BigInt(env.QORE_CONFIRMATIONS);
+  const from = cursor ? BigInt(cursor.lastConsensusTs) + 1n : await startBlock(agreement.id);
+
+  // Chunks are processed in order and the cursor moves after each one, so a failure halfway only repeats the last chunk.
+  for (const [a, b] of blockRanges(from, safeHead, BigInt(env.QORE_LOGS_CHUNK_BLOCKS))) {
+    const logs = await fetchTaskLogs(address, a, b);
+    for (const log of logs) {
+      const args = log.args as unknown as Record<string, unknown>;
+      const inserted = await db.insert(schema.chainEvents).values({
+        contract: address, event: log.eventName, txHash: log.transactionHash, logIndex: log.logIndex, consensusTs: String(log.blockNumber),
+        args: JSON.parse(JSON.stringify(args, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))),
+      }).onConflictDoNothing().returning({ id: schema.chainEvents.id });
+      if (inserted.length > 0) await applyEvent(agreement, log.eventName, args, log.transactionHash);
     }
-    const inserted = await db.insert(schema.chainEvents).values({
-      contract: address, event: decoded.eventName, txHash: log.transaction_hash, logIndex: log.index, consensusTs: log.timestamp,
-      args: JSON.parse(JSON.stringify(decoded.args, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))),
-    }).onConflictDoNothing().returning({ id: schema.chainEvents.id });
-    if (inserted.length > 0) await applyEvent(agreement, decoded.eventName, decoded.args as Record<string, unknown>, log.transaction_hash);
-    last = log.timestamp;
-  }
-  if (last !== (cursor?.lastConsensusTs ?? '0')) {
-    await db.insert(schema.chainCursor).values({ contract: address, lastConsensusTs: last })
-      .onConflictDoUpdate({ target: schema.chainCursor.contract, set: { lastConsensusTs: last } });
+    await db.insert(schema.chainCursor).values({ contract: address, lastConsensusTs: String(b) })
+      .onConflictDoUpdate({ target: schema.chainCursor.contract, set: { lastConsensusTs: String(b) } });
   }
 }
 

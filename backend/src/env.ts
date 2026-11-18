@@ -16,8 +16,10 @@ const schema = z.object({
   QORE_REST_URL: z.string().default('https://api-testnet.qore.host'),
   QORE_RPC_URL: z.string().default('https://rpc-testnet.qore.host'),
   QORE_EXPLORER_URL: z.string().default('https://explore.qore.network'),
-  // Legacy, removed with the mirror-node indexer in step 2.4.
-  HEDERA_MIRROR_URL: z.string().default('https://testnet.mirrornode.hedera.com'),
+  // Event indexer: the RPC refuses eth_getLogs ranges of 10,000 blocks or more, so scan in smaller chunks.
+  QORE_LOGS_CHUNK_BLOCKS: z.coerce.number().int().min(1).max(9_000).default(5_000),
+  // Only index events at least this many blocks old (finality is assumed instant on CometBFT; 1 is a cheap safety margin).
+  QORE_CONFIRMATIONS: z.coerce.number().int().min(0).default(1),
 
   // Inference provider for benchmark, verification and checklists. 'near' = NEAR AI Cloud (private inference in a TEE).
   // 'nvidia' is kept as an explicit alternative; there is no silent switching between the two.

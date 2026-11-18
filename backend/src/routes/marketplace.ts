@@ -3,7 +3,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireAgent, requireUser } from '../lib/auth.js';
-import { ensureTask, fundUrl, loadDesignInputs, payoutUrl } from '../chain/ops.js';
+import { ensureTask, loadDesignInputs, payoutUrl } from '../chain/ops.js';
 import { requestDesign } from '../designer/client.js';
 import { dispatchTask, requestQuotes } from '../agents/dispatch.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
@@ -245,7 +245,7 @@ export async function marketplaceRoutes(app: FastifyInstance) {
     return value;
   });
 
-  // How the client funds the task: over x402 (agents, key-based clients) or by calling fund() from a wallet.
+  // How the client funds the task: by calling fund() from a wallet (QoreX or MetaMask), sending exactly the price in wei.
   app.get('/agreements/:id/funding', async (req, reply) => {
     const { id } = idParam.parse(req.params);
     const [a] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, id)).limit(1);
@@ -255,13 +255,11 @@ export async function marketplaceRoutes(app: FastifyInstance) {
       status: a.status,
       priceTinybar: String(a.priceTinybar),
       taskContract: a.escrowAddress,
-      taskAccountId: a.taskAccountId,
-      x402: { url: fundUrl(id), network: 'hedera:testnet', asset: '0.0.0', amountTinybar: String(a.priceTinybar), payTo: a.taskAccountId },
-      wallet: { method: 'fund()', to: a.escrowAddress, valueTinybar: String(a.priceTinybar), note: 'JSON-RPC value is tinybar x 10^10 (weibar)' },
+      wallet: { method: 'fund()', to: a.escrowAddress, valueWei: String(a.priceTinybar), note: 'Amounts are wei (1 QOR = 1e18). The sender needs a registered PQC key and an open EVM window.' },
     };
   });
 
-  // Where agent A pays each sub-agent (over x402) after the task is released.
+  // Where agent A pays each sub-agent after the task is released.
   app.get('/agreements/:id/payouts', async (req) => {
     const { id } = idParam.parse(req.params);
     const legs = await db.select().from(schema.subLegs).where(eq(schema.subLegs.agreementId, id));

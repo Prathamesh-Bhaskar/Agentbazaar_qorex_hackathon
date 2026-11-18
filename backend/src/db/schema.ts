@@ -174,13 +174,13 @@ export const chainEvents = pgTable('chain_events', {
   event: text('event').notNull(),
   txHash: text('tx_hash').notNull(),
   logIndex: integer('log_index').notNull(),
-  consensusTs: text('consensus_ts').notNull(),
+  consensusTs: text('consensus_ts').notNull(), // block number of the event (column name kept from the earlier version)
   args: jsonb('args'),
 }, (t) => [uniqueIndex('chain_events_tx_log').on(t.txHash, t.logIndex)]);
 
 export const chainCursor = pgTable('chain_cursor', {
   contract: text('contract').primaryKey(),
-  lastConsensusTs: text('last_consensus_ts').notNull(),
+  lastConsensusTs: text('last_consensus_ts').notNull(), // last fully scanned block number
 });
 
 // GitHub OAuth: one connection per user; states are single-use and expire quickly.
