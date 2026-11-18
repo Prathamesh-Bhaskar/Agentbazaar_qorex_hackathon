@@ -30,6 +30,8 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | A larger window replaces the previous one and EVM value transfers count against `maxValue` | window re-opened with 50,000,000 uqor; six transfers (35 QOR) then succeeded |
 | `TaskFactory` (compiled with `evm_version = paris`) deploys and works on chain 9800; roles read back correctly (Q4 answered for the factory, which embeds the full `TaskEscrow` creation code) | `0x83CD43960C3634bfCc63D22C971Aa2f9c8477719`, tx `0xeae17561…2540`, 10,605 bytes of runtime code |
 | Full escrow cycle works on chain 9800 with the real `TaskEscrow`: createTask by the designer (gas 1,652,050), `fund` 1 QOR, `submit`, `release` with a verifier EIP-712 verdict; agent received exactly 1 QOR; final state Released | task `0x85a0dDA4180DE58d9A8d556Df9e615D4A34dFeC0`; script `backend/scripts/qore/smoke.mjs` |
+| An EVM window expires by block count (about 5 hours for 17,280 blocks); a send after expiry is refused with `remaining: 0 blocks` | observed 18 Nov on the operator account; re-opened by `backend/scripts/qore/open-window.mjs`, tx `8314A094…D86A` |
+| Verifier key rotated on 18 Nov (the old key was shown in a tool output); factory `setRoles` updated | tx `0x501b4d4bebe122740e8c47be91f36624dd0aa9f5ed5ef900e6eda32ce8036fe7` |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -44,7 +46,7 @@ Accounts (public addresses; keys and PQC recovery codes are in the git-ignored `
 |---|---|---|
 | operator / relayer / factory owner | `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3` | yes |
 | designer | `0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9` | yes |
-| verifier | `0xbF4EbcBB325E4d0e8D0Bc44D3faF8CC70c9610fC` | no, signs verdicts only |
+| verifier | `0xaD35905450242d327dd101A51CE0c040098B493f` | no, signs verdicts only |
 | agent solidity-dev | `0x8B4F0927894Dcb933aB847a71f048d21171C73B7` | pays sub-agents |
 | agent security-auditor | `0xeA953851bF7f784aeBf1EBaFc9E4A96daE7116B3` | receives |
 | agent test-writer | `0x13F83608C9201F6a287e3D0bEB813683C75048D5` | pays/receives |
