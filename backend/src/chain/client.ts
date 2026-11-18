@@ -8,32 +8,33 @@ import { taskEscrowAbi } from './abi.js';
 
 export class ChainError extends Error {}
 
-// viem sees HBAR in weibar (18 decimals) through the JSON-RPC relay. Contracts see tinybar.
-export const hederaTestnet = defineChain({
-  id: env.HEDERA_CHAIN_ID,
-  name: 'Hedera Testnet',
-  nativeCurrency: { name: 'HBAR', symbol: 'HBAR', decimals: 18 },
-  rpcUrls: { default: { http: [env.HEDERA_RPC_URL] } },
-  blockExplorers: { default: { name: 'HashScan', url: 'https://hashscan.io/testnet' } },
+// QoreChain's EVM lane uses 18 decimals: viem, msg.value and the contracts all see wei (1 QOR = 1e18).
+export const qorechainTestnet = defineChain({
+  id: env.QORE_CHAIN_ID,
+  name: 'QoreChain Diana Testnet',
+  nativeCurrency: { name: 'QOR', symbol: 'QOR', decimals: 18 },
+  rpcUrls: { default: { http: [env.QORE_EVM_RPC_URL] } },
+  blockExplorers: { default: { name: 'QoreChain Explorer', url: env.QORE_EXPLORER_URL } },
 });
 
 export const publicClient = createPublicClient({
-  chain: hederaTestnet,
-  transport: http(env.HEDERA_RPC_URL, { retryCount: 4, retryDelay: 1500 }),
+  chain: qorechainTestnet,
+  transport: http(env.QORE_EVM_RPC_URL, { retryCount: 4, retryDelay: 1500 }),
 });
 
 const asKey = (k: string) => (k.startsWith('0x') ? k : `0x${k}`) as Hex;
 
 function relayerAccount() {
-  if (!env.RELAYER_PRIVATE_KEY) throw new ChainError('RELAYER_PRIVATE_KEY is not set');
-  return privateKeyToAccount(asKey(env.RELAYER_PRIVATE_KEY));
+  if (!env.QORE_OPERATOR_PRIVATE_KEY) throw new ChainError('QORE_OPERATOR_PRIVATE_KEY is not set');
+  return privateKeyToAccount(asKey(env.QORE_OPERATOR_PRIVATE_KEY));
 }
 function verifierAccount() {
-  if (!env.VERIFIER_PRIVATE_KEY) throw new ChainError('VERIFIER_PRIVATE_KEY is not set');
-  return privateKeyToAccount(asKey(env.VERIFIER_PRIVATE_KEY));
+  if (!env.QORE_VERIFIER_PRIVATE_KEY) throw new ChainError('QORE_VERIFIER_PRIVATE_KEY is not set');
+  return privateKeyToAccount(asKey(env.QORE_VERIFIER_PRIVATE_KEY));
 }
 
-// Hedera needs explicit gas limits. Payouts to addresses that do not exist yet cost ~600k extra (auto-creation).
+// Explicit gas limits. The 18 Nov smoke test measured 1.65M for createTask and about 100-150k for fund/submit/release; these
+// limits are generous and get re-measured in step 2.3 (the window manager sizes maxValue from gas limit x fee cap).
 const GAS = { confirmFunding: 300_000n, addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
 
 // One relayer wallet means one nonce stream: send transactions strictly one at a time.
@@ -46,7 +47,7 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
 
 async function send(args: { address: Address; abi: Abi; functionName: string; args: readonly unknown[]; gas: bigint }) {
   return serial(async () => {
-    const wallet = createWalletClient({ account: relayerAccount(), chain: hederaTestnet, transport: http(env.HEDERA_RPC_URL, { retryCount: 3, retryDelay: 1500 }) });
+    const wallet = createWalletClient({ account: relayerAccount(), chain: qorechainTestnet, transport: http(env.QORE_EVM_RPC_URL, { retryCount: 3, retryDelay: 1500 }) });
     const gasPrice = await publicClient.getGasPrice();
     const hash = await wallet.writeContract({
       address: args.address, abi: args.abi, functionName: args.functionName, args: args.args, gas: args.gas, type: 'legacy', gasPrice,
@@ -62,7 +63,7 @@ export const agreementIdBytes = (uuid: string): Hex => keccak256(toBytes(uuid));
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** The public relay sometimes answers a read with a spurious 400/5xx. Reads are safe to repeat. */
+/** The public RPC can answer a read with a spurious error or a rate limit. Reads are safe to repeat. */
 async function retryRead<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
   let last: unknown;
   for (let i = 0; i < tries; i++) {
@@ -135,7 +136,7 @@ export async function addSubLegOnChain(a: { task: Address; subAgent: Address; pr
 }
 
 // ---------- verifier signatures (EIP-712). Domain verifyingContract = the task, so signatures can't cross tasks. ----------
-const domain = (task: Address) => ({ name: 'AgentForge', version: '1', chainId: env.HEDERA_CHAIN_ID, verifyingContract: task }) as const;
+const domain = (task: Address) => ({ name: 'AgentForge', version: '1', chainId: env.QORE_CHAIN_ID, verifyingContract: task }) as const;
 
 /** Unique within a task (verdicts and sub-legs share one nonce set). Fits a Postgres bigint. */
 export const randomNonce = () => BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000));

@@ -9,8 +9,14 @@ const schema = z.object({
   API_PUBLIC_URL: z.string().default('http://localhost:4000'), // how agents reach this API (submit, a2a)
   DATABASE_URL: z.string().min(1, 'DATABASE_URL (Neon connection string) is required'),
 
-  HEDERA_RPC_URL: z.string().default('https://testnet.hashio.io/api'),
-  HEDERA_CHAIN_ID: z.coerce.number().default(296),
+  // QoreChain testnet (qorechain-diana). EVM lane for contracts, Cosmos REST/RPC for PQC keys, windows and native payments.
+  QORE_EVM_RPC_URL: z.string().default('https://evm-testnet.qore.host'),
+  QORE_CHAIN_ID: z.coerce.number().default(9800),
+  QORE_COSMOS_CHAIN_ID: z.string().default('qorechain-diana'),
+  QORE_REST_URL: z.string().default('https://api-testnet.qore.host'),
+  QORE_RPC_URL: z.string().default('https://rpc-testnet.qore.host'),
+  QORE_EXPLORER_URL: z.string().default('https://explore.qore.network'),
+  // Legacy, removed with the mirror-node indexer in step 2.4.
   HEDERA_MIRROR_URL: z.string().default('https://testnet.mirrornode.hedera.com'),
 
   // Inference provider for benchmark, verification and checklists. 'near' = NEAR AI Cloud (private inference in a TEE).
@@ -36,8 +42,10 @@ const schema = z.object({
   GATEWAY_PORT: z.coerce.number().default(4402),
   GATEWAY_PUBLIC_URL: z.string().default('http://localhost:4402'),
   INDEXER_ENABLED: z.string().default('true'),
-  RELAYER_PRIVATE_KEY: z.string().optional(),
-  VERIFIER_PRIVATE_KEY: z.string().optional(),
+  // Operator = relayer + factory owner: sends every backend transaction. Verifier only signs EIP-712 verdicts.
+  QORE_OPERATOR_PRIVATE_KEY: z.string().optional(),
+  QORE_OPERATOR_PQC_RECOVERY_CODE: z.string().optional(),
+  QORE_VERIFIER_PRIVATE_KEY: z.string().optional(),
 
   // GitHub OAuth app (optional; without it only public repos work)
   GITHUB_CLIENT_ID: z.string().optional(),
