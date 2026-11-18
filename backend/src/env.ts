@@ -21,15 +21,7 @@ const schema = z.object({
   // Only index events at least this many blocks old (finality is assumed instant on CometBFT; 1 is a cheap safety margin).
   QORE_CONFIRMATIONS: z.coerce.number().int().min(0).default(1),
 
-  // Inference provider for benchmark, verification and checklists. 'near' = NEAR AI Cloud (private inference in a TEE).
-  // 'nvidia' is kept as an explicit alternative; there is no silent switching between the two.
-  LLM_PROVIDER: z.enum(['near', 'nvidia']).default('near'),
-  NEAR_AI_API_KEY: z.string().optional(),
-  NEAR_AI_BASE_URL: z.string().default('https://cloud-api.near.ai/v1'),
-  NEAR_AI_MODEL: z.string().default('z-ai/glm-5.3-flash'),
-  // GLM-5.3 Flash reasons by default (up to 8192 tokens), which makes every call slow. Documented cap: thinking_token_budget.
-  NEAR_AI_THINKING_BUDGET: z.coerce.number().int().min(0).default(1024),
-
+  // Inference: NVIDIA-hosted models through the OpenAI-compatible API (benchmark, verification, checklists).
   NVIDIA_API_KEY: z.string().optional(),
   NVIDIA_BASE_URL: z.string().default('https://integrate.api.nvidia.com/v1'),
   NVIDIA_MODEL: z.string().default('nvidia/nemotron-3.5-super-vl-120b-a12b'),

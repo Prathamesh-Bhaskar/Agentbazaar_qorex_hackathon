@@ -66,7 +66,7 @@ export const benchmarkRuns = pgTable('benchmark_runs', {
   items: jsonb('items'),
   error: text('error'),
   reportRoot: text('report_root'),
-  proof: jsonb('proof'), // LlmProof: NEAR AI response-signature check for the AI review (null = none recorded)
+  proof: jsonb('proof'), // unused since the NVIDIA-only AI layer (no attestation exists); stays null
   createdAt: createdAt(),
 });
 
@@ -128,7 +128,7 @@ export const verifications = pgTable('verifications', {
   summary: text('summary'),
   error: text('error'),
   reportRoot: text('report_root'),
-  proof: jsonb('proof'), // LlmProof for the AI judgement behind this result (null = none recorded)
+  proof: jsonb('proof'), // unused since the NVIDIA-only AI layer (no attestation exists); stays null
   createdAt: createdAt(),
 });
 

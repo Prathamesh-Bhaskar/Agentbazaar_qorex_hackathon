@@ -42,7 +42,6 @@ async function runBenchmark(runId: string, agentId: string) {
         reviewText: result.review,
         items: result.items,
         reportRoot,
-        proof: result.proof,
         error: storageNote,
       })
       .where(eq(schema.benchmarkRuns.id, runId));
@@ -51,7 +50,7 @@ async function runBenchmark(runId: string, agentId: string) {
       .set({ status: passed ? 'listed' : 'failed', repoCommit: repo.commit, latestBenchmarkId: runId })
       .where(eq(schema.agents.id, agentId));
   } catch (e) {
-    // Infrastructure problems (GitHub, NEAR AI) are an error, not a failed benchmark.
+    // Infrastructure problems (GitHub, the AI service) are an error, not a failed benchmark.
     await db
       .update(schema.benchmarkRuns)
       .set({ status: 'error', error: (e as Error).message })

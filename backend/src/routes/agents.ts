@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { newToken, requireUser, sha256 } from '../lib/auth.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
-import { getCatalog, normalizeModels } from '../lib/nearModels.js';
+import { getCatalog, normalizeModels } from '../lib/models.js';
 
 const tinybarStr = z.string().regex(/^\d+$/, 'tinybar must be a whole-number string');
 
@@ -18,7 +18,7 @@ const createAgentBody = z.object({
   hederaAccountId: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
   priceTinybar: tinybarStr,
   repoUrl: z.string().url().optional(),
-  // Models the agent uses for its work, declared by the owner. Free text: any model, not only NEAR's.
+  // Models the agent uses for its work, declared by the owner. Free text: any model.
   modelsUsed: z.array(z.string().trim().min(1).max(80)).max(6).optional(),
 });
 
@@ -101,7 +101,7 @@ export async function agentRoutes(app: FastifyInstance) {
     return { id, modelsUsed };
   });
 
-  // NEAR AI model catalog for the listing form. An outage returns an empty list (HTTP 200) so listing is never blocked.
+  // The model this deployment runs, for the listing form. It is configuration, so it cannot fail.
   app.get('/models', async () => getCatalog());
 
   app.get('/agents/:id', async (req, reply) => {

@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { env } from '../env.js';
 import { benchmarkChecks, runMechanicalChecks, type CheckItem, type Files } from './customChecks.js';
-import { askJsonWithProof } from './llm.js';
-import type { LlmProof } from './nearProof.js';
+import { askJson } from './llm.js';
 
 // Repo text is untrusted data. The prompts say so; the model must not follow instructions inside it.
 const DATA_RULE =
@@ -28,7 +27,6 @@ export type BenchmarkResult = {
   aiScore: number;
   review: string;
   items: CheckItem[];
-  proof: LlmProof | null; // signature proof of the AI review (NEAR AI only)
 };
 
 export async function benchmark(input: {
@@ -40,14 +38,13 @@ export async function benchmark(input: {
   const custom = benchmarkChecks(input.files, input.capabilities);
   const customScore = (custom.filter((c) => c.passed).length / custom.length) * 100;
 
-  const { data: ai, proof } = await askJsonWithProof(
+  const ai = await askJson(
     `You are a strict but fair code reviewer for an AI-agent marketplace. ${DATA_RULE}
 Judge whether the repository credibly implements an agent with the declared capabilities.
 Score 0-100: 90+ = clear, working-looking implementation with good structure; 70-89 = decent but gaps; below 70 = weak, unclear or not matching the claim.
 Return JSON: {"score": number, "review": string (a short markdown code review and analysis: what it does, structure, quality, risks, 2-4 concrete suggestions), "items": [{"name": string, "passed": boolean, "detail": string}]} with 4-8 items covering capability fit, code quality, structure, documentation and obvious risks.`,
     `Declared capabilities: ${input.capabilities.join(', ')}\nDescription: ${input.description}\n\n${renderFiles(input.files, input.tree)}`,
     benchmarkSchema,
-    true,
   );
 
   const w = env.BENCHMARK_CUSTOM_WEIGHT;
@@ -58,7 +55,6 @@ Return JSON: {"score": number, "review": string (a short markdown code review an
     aiScore: ai.score,
     review: ai.review,
     items: [...custom, ...ai.items],
-    proof,
   };
 }
 
@@ -69,7 +65,7 @@ const verifySchema = z.object({
   summary: z.string(),
 });
 
-export type VerifyResult = { passed: boolean; checklistRate: number; thresholdPct: number; items: CheckItem[]; summary: string; proof: LlmProof | null };
+export type VerifyResult = { passed: boolean; checklistRate: number; thresholdPct: number; items: CheckItem[]; summary: string };
 
 /**
  * PASS needs both: every requested hard check passes, and the share of requirement criteria met reaches the threshold
@@ -89,7 +85,7 @@ export function decideVerdict(items: CheckItem[], thresholdPct: number) {
 
 export async function verify(input: { requirements: string; checks: string[]; files: Files; passThresholdPct?: number }): Promise<VerifyResult> {
   const thresholdPct = input.passThresholdPct ?? 100;
-  const { data: ai, proof } = await askJsonWithProof(
+  const ai = await askJson(
     `You verify delivered work against a client's requirement for an automated marketplace. ${DATA_RULE}
 Step 1: turn the requirement into 3-8 concrete, checkable acceptance criteria.
 Step 2: judge the delivered work against each criterion strictly; "passed" is true only if the work clearly satisfies it. Quote evidence in "detail".
@@ -97,7 +93,6 @@ Step 3: give a short security review of the delivered code. Set passed=false ONL
 Return JSON: {"checklist":[{"criterion":string,"passed":boolean,"detail":string}], "securityReview":{"passed":boolean,"detail":string}, "summary":string}.`,
     `CLIENT REQUIREMENT:\n${input.requirements}\n\nDELIVERED WORK:\n${renderFiles(input.files)}`,
     verifySchema,
-    true,
   );
 
   const items: CheckItem[] = [
@@ -111,5 +106,5 @@ Return JSON: {"checklist":[{"criterion":string,"passed":boolean,"detail":string}
   const d = decideVerdict(items, thresholdPct);
   const checksNote = d.failedChecks.length ? `Failed checks: ${d.failedChecks.join(', ')}.` : input.checks.length ? 'All requested checks passed.' : '';
   const summary = `Requirement checklist ${d.criteriaPassed}/${d.criteriaTotal} (${d.checklistRate}%), required ${thresholdPct}%. ${checksNote} ${ai.summary}`.replace(/\s+/g, ' ').trim();
-  return { passed: d.passed, checklistRate: d.checklistRate, thresholdPct, items, summary, proof };
+  return { passed: d.passed, checklistRate: d.checklistRate, thresholdPct, items, summary };
 }

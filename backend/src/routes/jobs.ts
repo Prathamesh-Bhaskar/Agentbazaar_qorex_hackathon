@@ -62,7 +62,6 @@ export async function runVerification(agreementId: string) {
       items: result.items,
       summary: result.summary,
       reportRoot,
-      proof: result.proof,
     });
     await db.insert(schema.verdicts).values({ agreementId, result: verdictResult }).onConflictDoNothing();
     // Sign the verdict and send release/refund. If the chain fails the verdict is kept and POST /agreements/:id/settle retries.
