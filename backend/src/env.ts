@@ -42,6 +42,11 @@ const schema = z.object({
   GATEWAY_PORT: z.coerce.number().default(4402),
   GATEWAY_PUBLIC_URL: z.string().default('http://localhost:4402'),
   INDEXER_ENABLED: z.string().default('true'),
+  // EVM authorisation window sizing for backend accounts (chain bounds: blocks 1..17280, txs 1..1000; value counted in uqor, 1 QOR = 1e6).
+  QORE_WINDOW_BLOCKS: z.coerce.number().int().min(1).max(17_280).default(17_280),
+  QORE_WINDOW_MAX_TXS: z.coerce.number().int().min(1).max(1_000).default(200),
+  QORE_WINDOW_MAX_VALUE_UQOR: z.string().regex(/^\d+$/).default('5000000'),
+  QORE_WINDOW_MIN_BLOCKS: z.coerce.number().int().min(0).default(120), // renew when fewer blocks than this remain
   // Operator = relayer + factory owner: sends every backend transaction. Verifier only signs EIP-712 verdicts.
   QORE_OPERATOR_PRIVATE_KEY: z.string().optional(),
   QORE_OPERATOR_PQC_RECOVERY_CODE: z.string().optional(),

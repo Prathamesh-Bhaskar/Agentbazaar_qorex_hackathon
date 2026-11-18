@@ -32,6 +32,8 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | Full escrow cycle works on chain 9800 with the real `TaskEscrow`: createTask by the designer (gas 1,652,050), `fund` 1 QOR, `submit`, `release` with a verifier EIP-712 verdict; agent received exactly 1 QOR; final state Released | task `0x85a0dDA4180DE58d9A8d556Df9e615D4A34dFeC0`; script `backend/scripts/qore/smoke.mjs` |
 | An EVM window expires by block count (about 5 hours for 17,280 blocks); a send after expiry is refused with `remaining: 0 blocks` | observed 18 Nov on the operator account; re-opened by `backend/scripts/qore/open-window.mjs`, tx `8314A094…D86A` |
 | Verifier key rotated on 18 Nov (the old key was shown in a tool output); factory `setRoles` updated | tx `0x501b4d4bebe122740e8c47be91f36624dd0aa9f5ed5ef900e6eda32ce8036fe7` |
+| A send that reverts on chain is charged against the window at its full gas limit x price (300,000 gas -> 33,750 uqor), not gas used; successful sends are charged gas used x price (55,330 gas -> 6,640 uqor) | window counters read before and after on 18 Nov |
+| Window manager behaviour (step 2.3): a healthy window is not re-opened; `ensureWindow(..., force)` opens one with the env sizing (200 txs, 5,000,000 uqor); a real operator send consumed 1 tx | `backend/src/chain/window.ts`, live run 18 Nov |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |

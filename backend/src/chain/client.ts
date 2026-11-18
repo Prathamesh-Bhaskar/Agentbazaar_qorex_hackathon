@@ -5,6 +5,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { env } from '../env.js';
 import { taskEscrowAbi } from './abi.js';
+import { costUqor, isWindowProblem, QoreIdentity, WindowError } from './window.js';
 
 export class ChainError extends Error {}
 
@@ -37,6 +38,10 @@ function verifierAccount() {
 // limits are generous and get re-measured in step 2.3 (the window manager sizes maxValue from gas limit x fee cap).
 const GAS = { confirmFunding: 300_000n, addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
 
+// The operator sends every backend transaction, so it needs a registered PQC key and a live EVM window (SPEC R3).
+const operator = new QoreIdentity('operator', env.QORE_OPERATOR_PRIVATE_KEY, env.QORE_OPERATOR_PQC_RECOVERY_CODE);
+export const operatorIdentity = () => operator;
+
 // One relayer wallet means one nonce stream: send transactions strictly one at a time.
 let queue: Promise<unknown> = Promise.resolve();
 function serial<T>(fn: () => Promise<T>): Promise<T> {
@@ -49,9 +54,25 @@ async function send(args: { address: Address; abi: Abi; functionName: string; ar
   return serial(async () => {
     const wallet = createWalletClient({ account: relayerAccount(), chain: qorechainTestnet, transport: http(env.QORE_EVM_RPC_URL, { retryCount: 3, retryDelay: 1500 }) });
     const gasPrice = await publicClient.getGasPrice();
-    const hash = await wallet.writeContract({
+    // Budget the window with a 2x fee-cap margin. Opening a window advances the nonce; viem reads the nonce when it sends.
+    const need = costUqor(args.gas, gasPrice * 2n);
+    const write = () => wallet.writeContract({
       address: args.address, abi: args.abi, functionName: args.functionName, args: args.args, gas: args.gas, type: 'legacy', gasPrice,
     } as never);
+    let hash: Hex;
+    try {
+      await operator.ensureWindow(need);
+      try { hash = await write(); }
+      catch (e) {
+        if (!isWindowProblem(e)) throw e;
+        await operator.ensureWindow(need, true); // a race or an early expiry: open a fresh window and try once more
+        hash = await write();
+      }
+    } catch (e) {
+      // Never report a send that did not happen. The caller keeps the operation queued (rules 3 and 4).
+      if (e instanceof WindowError) throw new ChainError(e.message);
+      throw e;
+    }
     const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000, pollingInterval: 2_000 });
     if (receipt.status !== 'success') throw new ChainError(`Transaction reverted: ${hash}`);
     return { hash, receipt };
