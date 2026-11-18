@@ -13,7 +13,6 @@ import { agentApiRoutes } from './routes/agentApi.js';
 import { meRoutes } from './routes/me.js';
 import { startIndexer } from './chain/indexer.js';
 import { startRetries } from './agents/retries.js';
-import { startGateway } from './x402/gateway.js';
 
 // Postgres bigint columns (verdict nonce) come back as BigInt; make them JSON-safe as decimal strings.
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function (this: bigint) { return this.toString(); };
@@ -59,5 +58,4 @@ if (!process.env.VITEST) {
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
   startIndexer();
   startRetries();
-  startGateway();
 }

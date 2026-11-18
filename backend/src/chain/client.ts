@@ -36,7 +36,7 @@ function verifierAccount() {
 
 // Explicit gas limits. The 18 Nov smoke test measured 1.65M for createTask and about 100-150k for fund/submit/release; these
 // limits are generous and get re-measured in step 2.3 (the window manager sizes maxValue from gas limit x fee cap).
-const GAS = { confirmFunding: 300_000n, addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
+const GAS = { addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
 
 // The operator sends every backend transaction, so it needs a registered PQC key and a live EVM window (SPEC R3).
 const operator = new QoreIdentity('operator', env.QORE_OPERATOR_PRIVATE_KEY, env.QORE_OPERATOR_PQC_RECOVERY_CODE);
@@ -129,9 +129,6 @@ export async function readDesignProof(task: Address, legCount: number) {
   return { price, deadlineUnix: Number(deadline), maxSubBps: Number(maxSubBps), maxSubLegs: Number(maxSubLegs), payoutGrace: Number(payoutGrace), legs };
 }
 
-export const confirmFundingOnChain = (task: Address) =>
-  send({ address: task, abi: taskEscrowAbi, functionName: 'confirmFunding', args: [], gas: GAS.confirmFunding });
-
 export const submitOnChain = (task: Address, deliverableHash: Hex) =>
   send({ address: task, abi: taskEscrowAbi, functionName: 'submit', args: [deliverableHash], gas: GAS.submit });
 
@@ -141,8 +138,8 @@ export const releaseOnChain = (task: Address, nonce: bigint, sig: Hex) =>
 export const refundOnChain = (task: Address, nonce: bigint, sig: Hex) =>
   send({ address: task, abi: taskEscrowAbi, functionName: 'refund', args: [nonce, sig], gas: GAS.refund });
 
-export const recordPayoutOnChain = (task: Address, legId: number, hederaTxId: string) =>
-  send({ address: task, abi: taskEscrowAbi, functionName: 'recordPayout', args: [BigInt(legId), hederaTxId], gas: GAS.recordPayout });
+export const recordPayoutOnChain = (task: Address, legId: number, payoutRef: string) =>
+  send({ address: task, abi: taskEscrowAbi, functionName: 'recordPayout', args: [BigInt(legId), payoutRef], gas: GAS.recordPayout });
 
 export const markDefaultOnChain = (task: Address, legId: number) =>
   send({ address: task, abi: taskEscrowAbi, functionName: 'markDefault', args: [BigInt(legId)], gas: GAS.markDefault });

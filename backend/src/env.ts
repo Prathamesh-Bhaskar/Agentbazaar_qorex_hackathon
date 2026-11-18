@@ -40,9 +40,6 @@ const schema = z.object({
 
   SOLIDITY_AGENT_URL: z.string().default('http://localhost:5001'),
   SOLIDITY_AGENT_SECRET: z.string().optional(),
-  X402_FACILITATOR_URL: z.string().default('https://api.testnet.blocky402.com'),
-  GATEWAY_PORT: z.coerce.number().default(4402),
-  GATEWAY_PUBLIC_URL: z.string().default('http://localhost:4402'),
   INDEXER_ENABLED: z.string().default('true'),
   // EVM authorisation window sizing for backend accounts (chain bounds: blocks 1..17280, txs 1..1000; value counted in uqor, 1 QOR = 1e6).
   QORE_WINDOW_BLOCKS: z.coerce.number().int().min(1).max(17_280).default(17_280),

@@ -20,8 +20,8 @@ import { EscrowState } from './abi.js';
  */
 export const legNotFailed = sql`not exists (select 1 from a2a_calls c where c.id = sub_legs.a2a_call_id and c.status = 'failed')`;
 
-export const payoutUrl = (agreementId: string, legId: number) => `${env.GATEWAY_PUBLIC_URL}/x402/settle/${agreementId}/${legId}`;
-export const fundUrl = (agreementId: string) => `${env.GATEWAY_PUBLIC_URL}/x402/fund/${agreementId}`;
+/** Where agent A reports its payment to a sub-agent (tx hash) so the backend can verify it on chain. Implemented in step 3.1. */
+export const payoutUrl = (agreementId: string, legId: number) => `${env.API_PUBLIC_URL}/agreements/${agreementId}/payouts/${legId}`;
 
 /** Load everything the designer needs about a quote: request, agent, client and the agent's track record. */
 export async function loadDesignInputs(quoteId: string) {
