@@ -15,7 +15,7 @@ export async function buildServer() {
     return reply.code(status).send({ error: (err as Error).message });
   });
 
-  app.get('/health', async () => ({ ok: true, agent: 'solidity-agent', aiConfigured: Boolean(env.NVIDIA_API_KEY), designer: env.DESIGNER_PRIVATE_KEY ? designerAddress() : null }));
+  app.get('/health', async () => ({ ok: true, agent: 'solidity-agent', aiConfigured: Boolean(env.NVIDIA_API_KEY), designer: env.QORE_DESIGNER_PRIVATE_KEY ? designerAddress() : null }));
 
   // Design the terms for one task. No chain access, no side effects.
   app.post('/design', async (req) => {
@@ -24,7 +24,7 @@ export async function buildServer() {
     return { spec: d.spec, specHash: d.specHash, trust: d.trust, source: d.source };
   });
 
-  // Deploy the task contract for an agreement. Spends the designer wallet's HBAR, so it needs the shared secret.
+  // Deploy the task contract for an agreement. Spends the designer account's QOR, so it needs the shared secret.
   app.post('/deploy', async (req, reply) => {
     if (!env.AGENT_SHARED_SECRET) return reply.code(503).send({ error: 'AGENT_SHARED_SECRET is not configured; /deploy is disabled' });
     if (req.headers['x-agent-secret'] !== env.AGENT_SHARED_SECRET) return reply.code(401).send({ error: 'Bad or missing x-agent-secret' });

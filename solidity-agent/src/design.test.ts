@@ -4,14 +4,14 @@ import { extractJson } from './analyze.js';
 import { canonicalJson, contractSpecSchema, heuristicAnalysis, specHash } from './spec.js';
 import type { Analyzer } from './analyze.js';
 
-const ONE_HBAR = 100_000_000n;
+const ONE_QOR = 10n ** 18n; // wei
 const fakeAi = (over: Partial<ReturnType<typeof heuristicAnalysis>> = {}): Analyzer => async () => ({
   analysis: { complexity: 3, effortHours: 6, risk: 'medium', summary: 'Moderate contract work.', suggestedChecks: ['lint_rules'], ...over },
   source: 'ai',
 });
 
-const reqFor = (stats: DesignRequest['agent']['stats'], price = 5n * ONE_HBAR): DesignRequest => ({
-  request: { requirements: 'Write an ERC-20 token with a fixed supply and no mint function.', budgetTinybar: (10n * ONE_HBAR).toString(), checksRequested: ['secrets_scan'] },
+const reqFor = (stats: DesignRequest['agent']['stats'], price = 5n * ONE_QOR): DesignRequest => ({
+  request: { requirements: 'Write an ERC-20 token with a fixed supply and no mint function.', budgetTinybar: (10n * ONE_QOR).toString(), checksRequested: ['secrets_scan'] },
   agent: { name: 'Builder', description: 'Writes contracts', capabilities: ['solidity'], stats },
   quotePriceTinybar: price.toString(),
 });
@@ -64,9 +64,9 @@ describe('guardrails: the model cannot push numbers past the bounds', () => {
     expect(s.maxSubLegs).toBeLessThanOrEqual(3);
   });
   it('warns when the quote is above the budget, but keeps the quoted price', async () => {
-    const d = await design(reqFor(newcomer, 20n * ONE_HBAR), fakeAi());
+    const d = await design(reqFor(newcomer, 20n * ONE_QOR), fakeAi());
     expect(d.spec.warnings.join(' ')).toMatch(/above the client budget/);
-    expect(d.spec.priceTinybar).toBe((20n * ONE_HBAR).toString());
+    expect(d.spec.priceTinybar).toBe((20n * ONE_QOR).toString());
   });
   it('flags the fallback when the AI is unavailable', async () => {
     const d = await design(reqFor(newcomer), async (i) => ({ analysis: heuristicAnalysis(i.requirements), source: 'fallback' }));

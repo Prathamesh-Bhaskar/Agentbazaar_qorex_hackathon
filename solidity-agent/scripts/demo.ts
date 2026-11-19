@@ -1,18 +1,18 @@
-// Same job, two providers -> two different contracts. With --deploy, also deploys one TaskEscrow on Hedera testnet.
+// Same job, two providers -> two different contracts. With --deploy, also deploys one TaskEscrow on QoreChain testnet.
 // Run: npm run demo            (design only)
-//      npm run demo -- --deploy (also deploys; spends a little testnet HBAR from the designer wallet)
+//      npm run demo -- --deploy (also deploys; spends a little testnet QOR from the designer account)
 import { randomUUID } from 'node:crypto';
 import { design, type DesignRequest } from '../src/design.js';
 import { deployTask } from '../src/deploy.js';
 
-const ONE_HBAR = 100_000_000n;
+const ONE_QOR = 10n ** 18n; // wei
 const requirements =
   'Build a Solidity vesting contract: tokens for 3 beneficiaries unlock linearly over 12 months with a 3-month cliff. ' +
   'The owner can revoke unvested tokens. Include events, access control and a full test suite.';
 
 const base = {
-  request: { requirements, budgetTinybar: (20n * ONE_HBAR).toString(), checksRequested: ['secrets_scan'] },
-  quotePriceTinybar: (10n * ONE_HBAR).toString(),
+  request: { requirements, budgetTinybar: (20n * ONE_QOR).toString(), checksRequested: ['secrets_scan'] },
+  quotePriceTinybar: (10n * ONE_QOR).toString(),
 };
 const providers: Record<string, DesignRequest['agent']> = {
   'NewcomerBot (benchmark 85, no jobs yet)': {
@@ -42,7 +42,7 @@ last!.spec.rationale.forEach((r) => console.log(' -', r));
 if (last!.spec.warnings.length) console.log('warnings:', last!.spec.warnings.join('; '));
 
 if (process.argv.includes('--deploy')) {
-  console.log('\n=== deploying the VeteranBot contract to Hedera testnet ===');
+  console.log('\n=== deploying the VeteranBot contract to QoreChain testnet ===');
   const veteran = await design({ ...base, agent: providers['VeteranBot (benchmark 92, 30 jobs, fast)'] });
   const agreementId = randomUUID();
   const out = await deployTask({

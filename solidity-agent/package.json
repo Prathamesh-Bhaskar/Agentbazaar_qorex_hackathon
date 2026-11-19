@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Contract designer agent: analyzes provider history and the client requirement, designs the dynamic terms, and deploys the TaskEscrow on Hedera.",
+  "description": "Contract designer agent: analyzes provider history and the client requirement, designs the dynamic terms, and deploys the TaskEscrow on QoreChain.",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
@@ -12,6 +12,8 @@
     "demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
+    "@cosmjs/stargate": "^0.38.1",
+    "@qorechain/sdk": "^0.14.0",
     "dotenv": "^18.0.9",
     "fastify": "^5.12.8",
     "openai": "^7.53.0",
