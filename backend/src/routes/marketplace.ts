@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireAgent, requireUser } from '../lib/auth.js';
 import { ensureTask, loadDesignInputs, payoutUrl } from '../chain/ops.js';
+import { legInstructions, reportPayout } from '../chain/payoutReport.js';
 import { requestDesign } from '../designer/client.js';
 import { dispatchTask, requestQuotes } from '../agents/dispatch.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
@@ -263,7 +264,18 @@ export async function marketplaceRoutes(app: FastifyInstance) {
   app.get('/agreements/:id/payouts', async (req) => {
     const { id } = idParam.parse(req.params);
     const legs = await db.select().from(schema.subLegs).where(eq(schema.subLegs.agreementId, id));
-    return legs.map((l) => ({ legId: l.legId, status: l.status, priceTinybar: String(l.priceTinybar), payeeAccountId: l.payeeAccountId, payUrl: payoutUrl(id, l.legId), payoutTx: l.payoutTx }));
+    return legs.map((l) => ({ ...legInstructions(l), status: l.status, payUrl: payoutUrl(id, l.legId), payoutTx: l.payoutTx }));
+  });
+
+  // Agent A reports its payment to a sub-agent. The transaction is read from the chain and checked against the leg; nothing in
+  // the request is trusted, so no login is needed. 200 = verified and recorded, 202 = verified but recording failed (repeat),
+  // 404/422 = not found or not the payment owed, 503 = the chain could not be asked (repeat).
+  app.post('/agreements/:id/payouts/:legId', async (req, reply) => {
+    const { id } = idParam.parse(req.params);
+    const { legId } = z.object({ legId: z.coerce.number().int().min(1) }).parse(req.params);
+    const { txHash } = z.object({ txHash: z.string().min(1) }).parse(req.body);
+    const r = await reportPayout(id, legId, txHash);
+    return reply.code(r.code).send(r.body);
   });
 
   // Jobs where I am the client (default) or jobs on agents I own (?as=agent). Rows carry the title, agent and client.

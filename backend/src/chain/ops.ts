@@ -8,6 +8,7 @@ import { buildAgentStats } from '../designer/dossier.js';
 import { agentHeaders } from '../agents/dispatch.js';
 import { requestDeploy, requestDesign } from '../designer/client.js';
 import { evmToQor } from '@qorechain/sdk';
+import { legInstructions } from './payoutReport.js';
 import {
   addSubLegOnChain, ChainError, readEscrowState, readTaskTerms, refundOnChain, releaseOnChain, retryIdempotent, signSubLeg, signVerdict, submitOnChain,
 } from './client.js';
@@ -166,7 +167,7 @@ export async function createSubLeg(args: { agreementId: string; calleeAgentId: s
   return { leg, callee, txHash };
 }
 
-/** Tell agent A (best effort) which sub-agents it now owes and where to pay them over x402. */
+/** Tell agent A (best effort) which sub-agents it now owes: who to pay, how much, and where to report the payment's tx hash. */
 export async function notifyPayoutsDue(agreementId: string) {
   const [agreement] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, agreementId)).limit(1);
   if (!agreement) return;
@@ -176,7 +177,7 @@ export async function notifyPayoutsDue(agreementId: string) {
   try {
     await fetch(`${agent.endpointUrl.replace(/\/$/, '')}/payouts-due`, {
       method: 'POST', headers: agentHeaders(),
-      body: JSON.stringify({ agreementId, legs: legs.map((l) => ({ legId: l.legId, priceTinybar: String(l.priceTinybar), payeeAccountId: l.payeeAccountId, payUrl: payoutUrl(agreementId, l.legId) })) }),
+      body: JSON.stringify({ agreementId, legs: legs.map((l) => ({ ...legInstructions(l), payUrl: payoutUrl(agreementId, l.legId) })) }),
       signal: AbortSignal.timeout(10_000),
     });
   } catch { /* the agent can also read GET /agreements/:id/payouts */ }

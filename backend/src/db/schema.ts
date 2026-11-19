@@ -1,6 +1,7 @@
 import {
   pgTable, uuid, text, timestamp, numeric, integer, boolean, jsonb, bigint, uniqueIndex, primaryKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // Money columns hold tinybar. numeric(38,0) returns strings; convert with BigInt() in code.
 const money = (name: string) => numeric(name, { precision: 38, scale: 0 });
@@ -164,9 +165,13 @@ export const payments = pgTable('payments', {
   txHash: text('tx_hash'),
   hederaTxId: text('hedera_tx_id'),
   payerAccountId: text('payer_account_id'),
+  legId: integer('leg_id'), // for kind 'a2a': the contract leg this payment settles
   status: text('status').notNull().default('pending'), // pending | confirmed | failed
   createdAt: createdAt(),
-});
+}, (t) => [
+  // One native payment tx can settle only one leg (kind a2a), whatever anyone reports.
+  uniqueIndex('payments_a2a_tx').on(t.txHash).where(sql`${t.kind} = 'a2a'`),
+]);
 
 export const chainEvents = pgTable('chain_events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -213,18 +218,18 @@ export const contractSpecs = pgTable('contract_specs', {
   createdAt: createdAt(),
 });
 
-// A -> B legs inside a task contract. A owes B after the task is released and pays over x402.
+// A -> B legs inside a task contract. A owes B after the task is released and pays with a hybrid-signed native QOR transfer.
 export const subLegs = pgTable('sub_legs', {
   id: uuid('id').primaryKey().defaultRandom(),
   agreementId: uuid('agreement_id').notNull().references(() => agreements.id),
   legId: integer('leg_id').notNull(), // index inside the contract (0 is the client leg)
   calleeAgentId: uuid('callee_agent_id').notNull().references(() => agents.id),
   payeeAddress: text('payee_address').notNull(),
-  payeeAccountId: text('payee_account_id').notNull(), // Hedera account id: x402 payTo
+  payeeAccountId: text('payee_account_id').notNull(), // the sub-agent's native qor1... address (the payee of A's transfer)
   priceTinybar: money('price_tinybar').notNull(),
   termsHash: text('terms_hash').notNull(),
   status: text('status').notNull().default('pending'), // pending | paid | defaulted
-  payoutTx: text('payout_tx'), // Hedera tx id of the x402 settlement
+  payoutTx: text('payout_tx'), // QoreChain tx hash of A's payment, as recorded on the contract (payoutRef)
   addLegTx: text('add_leg_tx'),
   a2aCallId: uuid('a2a_call_id'),
   createdAt: createdAt(),
