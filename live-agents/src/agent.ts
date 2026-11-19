@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { a2aCall, a2aQuote, BackendError, submitWork } from './backend.js';
 import { config } from './config.js';
 import { ask } from './llm.js';
-import { hbar, makeSay, secs, type Say } from './log.js';
-import { payer, settlementTx } from './pay.js';
+import { makeSay, qor, secs, type Say } from './log.js';
+import { checkPayment, payNative, reportPayment } from './pay.js';
 import { bySlug, type AgentDef } from './roster.js';
-import { loadState } from './state.js';
+import { loadLedger, loadState, saveLedger } from './state.js';
 
 const text = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2));
 // Structural checks look at the files delivered, so the deliverable must include the files they look for.
@@ -73,7 +73,7 @@ export async function runAgent(def: AgentDef) {
     return reply.code(202).send({ accepted: true, agreementId: ctx.agreementId });
   });
 
-  // Another agent hired this one. It is paid over x402 by the hiring agent once the whole task is released.
+  // Another agent hired this one. The hiring agent pays it with a hybrid-signed QOR transfer once the whole task is released.
   app.post('/a2a', async (req) => {
     const { input } = z.object({ input: z.unknown() }).passthrough().parse(req.body ?? {});
     const i = (input ?? {}) as Record<string, unknown>;
@@ -83,32 +83,18 @@ export async function runAgent(def: AgentDef) {
     said(`HIRED BY ANOTHER AGENT: working on ${sub.length} chars sent to me`);
     // A sub-task must finish well inside the hiring agent's HTTP limit (300 s), so its answer is capped lower than a full job.
     const review = await ask(def.system, `Task from another agent:\n"""\n${sub}\n"""`, { maxTokens: 4000, say: said });
-    said(`sub-task done in ${secs(t0)}: ${review.length} chars sent back. I am paid over x402 after the whole job is released.`);
+    said(`sub-task done in ${secs(t0)}: ${review.length} chars sent back. I am paid in QOR after the whole job is released.`);
     return { agent: def.slug, review };
   });
 
-  // The backend tells the hiring agent which sub-agents it owes. Pay each over x402 (autonomous, capped per payment).
+  // The backend tells the hiring agent that sub-agents are owed. The notice is only a trigger: who to pay, how much and where to
+  // report come from the backend's own payouts endpoint, so a spoofed notice cannot redirect money.
   app.post('/payouts-due', async (req, reply) => {
-    const m = me();
-    if (!m) return reply.code(503).send({ error: 'not registered' });
-    const { legs } = z.object({ legs: z.array(z.object({ legId: z.number(), payUrl: z.string().url() })) }).passthrough().parse(req.body);
-    const say = makeSay(def.name, (req.body as { agreementId?: string } | undefined)?.agreementId);
-    say(`PAYOUTS DUE: I owe ${legs.length} sub-agent(s), paying over x402`);
-    void (async () => {
-      for (const leg of legs) {
-        try {
-          // Spend control: never more than the leg's own price (the backend states it), and never more than 10 HBAR in any case.
-          // A fixed 1 HBAR cap refused every leg above 1 HBAR on bigger jobs.
-          const owed = BigInt(String((leg as { priceTinybar?: unknown }).priceTinybar ?? '0').replace(/\D/g, '') || '0');
-          const cap = owed > 0n && owed <= 1_000_000_000n ? owed : 100_000_000n;
-          const pay = payer(m.accountId, m.payoutKey, cap);
-          say(`paying leg ${leg.legId}${owed > 0n ? ` (${hbar(owed)})` : ''} over x402`);
-          const res = await pay(leg.payUrl);
-          if (res.status === 200) say(`PAID leg ${leg.legId} over x402, Hedera tx ${settlementTx(res)}`);
-          else say(`payment of leg ${leg.legId} REFUSED (${res.status}): ${(await res.text()).slice(0, 200)}`);
-        } catch (e) { say(`payment of leg ${leg.legId} FAILED: ${(e as Error).message}`); }
-      }
-    })();
+    if (!me()) return reply.code(503).send({ error: 'not registered' });
+    const body = z.object({ agreementId: z.string().uuid(), legs: z.array(z.object({ legId: z.number().int() }).passthrough()) }).passthrough().parse(req.body);
+    const say = makeSay(def.name, body.agreementId);
+    say(`PAYOUTS DUE: I owe ${body.legs.length} sub-agent(s); paying each with a hybrid-signed QOR transfer`);
+    void settlePayouts(def, body.agreementId, body.legs.map((l) => l.legId), say);
     return reply.code(202).send({ accepted: true });
   });
 
@@ -137,10 +123,10 @@ async function maybeReview(def: AgentDef, key: string, agreementId: string, requ
   try {
     say(`step 2/3: asking the platform whether I may hire ${subName} for a review`);
     const q = await a2aQuote(key, agreementId, target.agentId); // refused (403) if over the on-chain sub-agent cap
-    say(`hire allowed at ${hbar(q.priceTinybar)}; adding the leg to the contract on-chain and sending the draft to ${subName} (this takes 1-4 min)`);
+    say(`hire allowed at ${qor(q.priceTinybar)}; adding the leg to the contract on-chain and sending the draft to ${subName} (this takes 1-4 min)`);
     const hired = await a2aCall(key, q.callId, { code: draft });
     const review = text((hired.output as { review?: unknown })?.review ?? hired.output);
-    say(`${subName} answered in ${secs(t0)}: ${review.length} chars. ${subName} is paid ${hbar(q.priceTinybar)} over x402 after release.`);
+    say(`${subName} answered in ${secs(t0)}: ${review.length} chars. ${subName} is paid ${qor(q.priceTinybar)} after release.`);
     if (/critical|high/i.test(review) && !/VERDICT:\s*PASS/i.test(review)) {
       say('the reviewer reported critical/high problems: fixing the draft with them (second model call)');
       return await ask(def.system, `${jobPrompt(requirements, [])}\n\nYour draft:\n${draft}\n\nAn independent reviewer found these problems. Fix every real one and return the full corrected deliverable only:\n${review}`, { say });
@@ -151,4 +137,39 @@ async function maybeReview(def: AgentDef, key: string, agreementId: string, requ
     say(`review skipped after ${secs(t0)}, delivering the draft unreviewed: ${(e as Error).message}`);
   }
   return draft;
+}
+
+type BackendLeg = { legId: number; status: string; priceWei: string; amountUqor: string; payTo: string; payUrl: string };
+
+/** Pay each owed leg once (a ledger on disk prevents double payment), then report each payment so the backend can verify and record it. */
+async function settlePayouts(def: AgentDef, agreementId: string, legIds: number[], say: Say) {
+  let legs: BackendLeg[];
+  try {
+    const res = await fetch(`${config.backendUrl}/agreements/${agreementId}/payouts`, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`backend answered ${res.status}`);
+    legs = (await res.json()) as BackendLeg[];
+  } catch (e) { say(`could not read what I owe from the backend (${(e as Error).message}); not paying`); return; }
+
+  const ledger = loadLedger();
+  for (const legId of legIds) { // one at a time: one account, one sequence number
+    const leg = legs.find((l) => l.legId === legId);
+    if (!leg) { say(`the backend does not list leg ${legId}; not paying`); continue; }
+    const key = `${agreementId}:${legId}`;
+    let rec = ledger[key];
+    if (!rec && leg.status !== 'pending') { say(`leg ${legId} is already ${leg.status}; nothing to pay`); continue; }
+    if (!rec) {
+      const refusal = checkPayment({ payTo: leg.payTo, amountUqor: BigInt(leg.amountUqor), owedUqor: BigInt(leg.amountUqor), capUqor: config.chain.maxPayUqor });
+      if (refusal) { say(`REFUSED to pay leg ${legId}: ${refusal}`); continue; }
+      say(`paying leg ${legId}: ${qor(leg.priceWei)} to ${leg.payTo}`);
+      try {
+        const txHash = await payNative(def.slug, leg.payTo, BigInt(leg.amountUqor));
+        rec = { txHash, reported: false };
+        ledger[key] = rec; saveLedger(ledger); // written before reporting, so a crash can never lead to a second payment
+        say(`PAID leg ${legId}, QoreChain tx ${txHash}`);
+      } catch (e) { say(`payment of leg ${legId} FAILED, nothing was sent: ${(e as Error).message}`); continue; }
+    }
+    if (!rec.reported) {
+      if (await reportPayment(leg.payUrl, rec.txHash, say)) { rec.reported = true; saveLedger(ledger); say(`leg ${legId} is recorded on the contract`); }
+    }
+  }
 }

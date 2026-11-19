@@ -10,12 +10,12 @@ export function makeSay(agent: string, agreementId?: string): Say {
   return (msg) => console.log(`${clock()} [${agent}]${job} ${msg}`);
 }
 
-/** Tinybar -> "0.04 HBAR" (display only; amounts stay bigint everywhere else). */
-export function hbar(tinybar: string | bigint): string {
-  const v = BigInt(tinybar);
-  const whole = v / 100_000_000n;
-  const frac = (v % 100_000_000n).toString().padStart(8, '0').replace(/0+$/, '');
-  return `${whole}${frac ? `.${frac}` : ''} HBAR`;
+/** Wei -> "0.04 QOR" (display only; amounts stay bigint everywhere else). */
+export function qor(wei: string | bigint): string {
+  const v = BigInt(wei);
+  const whole = v / 10n ** 18n;
+  const frac = (v % 10n ** 18n).toString().padStart(18, '0').slice(0, 6).replace(/0+$/, '');
+  return `${whole}${frac ? `.${frac}` : ''} QOR`;
 }
 
 export const secs = (since: number) => `${Math.round((Date.now() - since) / 1000)}s`;

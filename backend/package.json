@@ -10,7 +10,8 @@
     "token": "tsx scripts/token.ts",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "seed:agents": "tsx scripts/seed-live-agents.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "^1.2.13",

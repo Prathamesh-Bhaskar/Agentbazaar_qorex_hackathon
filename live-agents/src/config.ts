@@ -12,7 +12,13 @@ export const config = {
   backendUrl: get('BACKEND_URL', 'http://localhost:4000').replace(/\/$/, ''),
   backendSecret: get('BACKEND_SECRET') || undefined,
   llm: llmConfig(),
-  network: 'hedera:testnet' as const,
+  chain: {
+    restUrl: get('QORE_REST_URL', 'https://api-testnet.qore.host'),
+    rpcUrl: get('QORE_RPC_URL', 'https://rpc-testnet.qore.host'),
+    cosmosChainId: get('QORE_COSMOS_CHAIN_ID', 'qorechain-diana'),
+    // Spend control: an agent never pays more than this in one payment, whatever it is told (uqor; 1 QOR = 1,000,000).
+    maxPayUqor: BigInt(get('AGENT_MAX_PAY_UQOR', '10000000')),
+  },
 };
 
 /** The model the agents use to do their work: NVIDIA-hosted, through the OpenAI-compatible API. */

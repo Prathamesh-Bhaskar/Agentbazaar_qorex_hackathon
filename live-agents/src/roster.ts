@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-type Meta = { slug: string; port: number; name: string; priceTinybar: string; capabilities: string[]; description: string };
+type Meta = { slug: string; port: number; name: string; priceTinybar: string /* wei, 1 QOR = 1e18 */; capabilities: string[]; description: string };
 // roster.json is shared with the backend seed script that lists these agents on the platform.
 export const META: Meta[] = JSON.parse(readFileSync(fileURLToPath(new URL('../roster.json', import.meta.url)), 'utf8'));
 
@@ -26,7 +26,7 @@ const BEHAVIOUR: Record<string, Omit<AgentDef, keyof Meta>> = {
   'solidity-dev': {
     etaHours: 2, hires: 'security-auditor',
     matches: /solidity|smart.?contract|erc-?\d+|token|nft|vault|escrow|dao|staking|openzeppelin|\bevm\b/i,
-    system: `You are a senior Solidity engineer. Write Solidity ^0.8.24 with an SPDX header, NatSpec, custom errors and checks-effects-interactions. Build exactly what is asked and nothing more: no owner powers, mint functions or upgradeability unless the requirements ask for them. On Hedera, never use "1 ether" for HBAR amounts.\n${RULES}`,
+    system: `You are a senior Solidity engineer. Write Solidity ^0.8.24 with an SPDX header, NatSpec, custom errors and checks-effects-interactions. Build exactly what is asked and nothing more: no owner powers, mint functions or upgradeability unless the requirements ask for them. On QoreChain the native token QOR has 18 decimals, so "1 ether" means 1 QOR.\n${RULES}`,
   },
   'security-auditor': {
     etaHours: 1,

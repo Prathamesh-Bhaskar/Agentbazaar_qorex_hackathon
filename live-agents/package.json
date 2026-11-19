@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Five simple single-prompt AI agents (NVIDIA) for the Gigiverse marketplace. Each runs as its own server.",
+  "description": "Five simple single-prompt AI agents (NVIDIA) for the AgentBazaar marketplace on QoreChain. Each runs as its own server.",
   "scripts": {
     "all": "tsx scripts/run-all.ts",
     "solidity": "tsx src/index.ts solidity-dev",
@@ -11,13 +11,12 @@
     "tests": "tsx src/index.ts test-writer",
     "docs": "tsx src/index.ts docs-writer",
     "dapp": "tsx src/index.ts dapp-dev",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@hiero-ledger/sdk": "^2.90.1",
-    "@x402/core": "^2.30.0",
-    "@x402/fetch": "^2.30.0",
-    "@x402/hedera": "^2.30.0",
+    "@cosmjs/stargate": "^0.38.1",
+    "@qorechain/sdk": "^0.14.0",
     "dotenv": "^18.0.9",
     "fastify": "^5.12.8",
     "openai": "^7.53.0",
@@ -26,6 +25,7 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
   }
 }
