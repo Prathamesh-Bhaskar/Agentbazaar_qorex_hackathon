@@ -122,7 +122,7 @@ export type TermsPreview = {
 export type Payment = {
   id: string;
   agreementId: string;
-  kind: 'fund' | 'release' | 'refund' | 'a2a';
+  kind: 'fund' | 'release' | 'refund' | 'a2a' | 'excess';
   amountTinybar: string;
   txHash: string | null;
   hederaTxId: string | null;

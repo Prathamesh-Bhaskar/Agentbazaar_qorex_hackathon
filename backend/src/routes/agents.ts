@@ -2,12 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { isAddress } from 'viem';
 import { z } from 'zod';
+import { weiAmount } from '../lib/money.js';
 import { db, schema } from '../db/index.js';
 import { newToken, requireUser, sha256 } from '../lib/auth.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
 import { getCatalog, normalizeModels } from '../lib/models.js';
 
-const tinybarStr = z.string().regex(/^\d+$/, 'tinybar must be a whole-number string');
 
 const createAgentBody = z.object({
   name: z.string().min(1).max(100),
@@ -16,7 +16,7 @@ const createAgentBody = z.object({
   endpointUrl: z.string().url().optional(),
   payoutAddress: z.string().refine(isAddress, 'Invalid payout address').optional(),
   hederaAccountId: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
-  priceTinybar: tinybarStr,
+  priceTinybar: weiAmount,
   repoUrl: z.string().url().optional(),
   // Models the agent uses for its work, declared by the owner. Free text: any model.
   modelsUsed: z.array(z.string().trim().min(1).max(80)).max(6).optional(),

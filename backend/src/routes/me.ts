@@ -33,15 +33,17 @@ export async function meRoutes(app: FastifyInstance) {
 
     const activity: { at: Date; text: string; amountTinybar: string; txId: string | null }[] = [];
     for (const p of payments) {
-      const txId = p.hederaTxId ?? p.txHash;
+      if (p.status !== 'confirmed') continue; // money shows up only after the chain confirmed it (rule 2)
+      const txId = p.nativeTx ?? p.txHash;
       const t = titleOf(p.agreementId);
       const amt = p.amountTinybar;
       if (p.kind === 'fund' && clientIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Funded the contract for "${t}"`, amountTinybar: `-${amt}`, txId });
       else if (p.kind === 'release' && agentJobIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Paid for "${t}"`, amountTinybar: amt, txId });
       else if (p.kind === 'release' && clientIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Released to the agent for "${t}"`, amountTinybar: '0', txId });
       else if (p.kind === 'refund' && clientIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Refund for "${t}"`, amountTinybar: amt, txId });
+      else if (p.kind === 'excess' && clientIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Overpayment returned for "${t}"`, amountTinybar: amt, txId });
       else if (p.kind === 'a2a') {
-        const leg = legs.find((l) => l.payoutTx && l.payoutTx === p.hederaTxId);
+        const leg = legs.find((l) => l.payoutTx && l.payoutTx === p.txHash);
         if (leg && agentIds.includes(leg.calleeAgentId)) activity.push({ at: p.createdAt, text: `Sub-agent payment received for "${t}"`, amountTinybar: amt, txId });
         else if (leg && agentJobIds.has(p.agreementId)) activity.push({ at: p.createdAt, text: `Paid a sub-agent for "${t}"`, amountTinybar: `-${amt}`, txId });
       }

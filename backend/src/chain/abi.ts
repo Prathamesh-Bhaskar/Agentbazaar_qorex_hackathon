@@ -12,12 +12,15 @@ const taskEscrowEventLines = [
   'event Refunded(bytes32 indexed agreementId, address client, uint256 amount)',
   'event PayoutRecorded(bytes32 indexed agreementId, uint256 legId, address payee, uint256 price, string payoutRef)',
   'event PayoutDefaulted(bytes32 indexed agreementId, uint256 legId, address debtor, address payee, uint256 price)',
+  'event ExcessReturned(bytes32 indexed agreementId, address client, uint256 amount)',
 ] as const;
 
 export const taskEscrowEvents = parseAbi(taskEscrowEventLines);
 
 export const taskEscrowAbi = parseAbi([
   'function fund() payable',
+  'function confirmFunding()',
+  'function sweepExcess()',
   'function addSubLeg(address subAgent, uint256 subPrice, bytes32 subTermsHash, uint256 nonce, bytes sig) returns (uint256 legId)',
   'function submit(bytes32 deliverableHash)',
   'function release(uint256 nonce, bytes sig)',

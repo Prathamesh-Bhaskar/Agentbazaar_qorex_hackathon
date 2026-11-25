@@ -4,6 +4,7 @@
 // Agents that cannot receive calls (behind NAT) pull the same data from GET /agent/requests and GET /agent/tasks.
 import { and, desc, eq, isNotNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
+import { weiAmount } from '../lib/money.js';
 import { db, schema } from '../db/index.js';
 import { env } from '../env.js';
 
@@ -21,7 +22,7 @@ const post = (url: string, body: unknown) =>
 /** What an agent answers to /quote: a price, or a refusal. */
 export const quoteReplySchema = z.object({
   decline: z.boolean().optional(),
-  priceTinybar: z.string().regex(/^\d+$/).optional(),
+  priceTinybar: weiAmount.optional(), // wei; at most 6 decimals of QOR
   etaHours: z.number().int().positive().optional(),
 });
 

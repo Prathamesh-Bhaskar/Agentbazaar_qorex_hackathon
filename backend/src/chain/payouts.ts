@@ -22,7 +22,7 @@ export type NativeTx = {
   tx_response: { code: number; height: string; timestamp: string; txhash: string; raw_log?: string };
 };
 
-export type PaymentExpectation = { from: string; to: string; minUqor: bigint; notBeforeUnix: number };
+export type PaymentExpectation = { from: string; to: string; minUqor: bigint; notBeforeUnix: number; parties?: { payer: string; payee: string; before: string } };
 export type PaymentCheck = { ok: true; paidUqor: bigint; height: bigint; timeUnix: number } | { ok: false; reason: string };
 
 /** Pure: decide whether a native tx is the payment a leg is owed. */
@@ -35,7 +35,8 @@ export function evaluatePayment(tx: NativeTx, want: PaymentExpectation): Payment
     if (m['@type'] !== MSG_SEND || m.from_address !== want.from || m.to_address !== want.to) continue;
     for (const c of m.amount ?? []) if (c.denom === 'uqor' && /^\d+$/.test(c.amount)) paid += BigInt(c.amount);
   }
-  if (paid === 0n) return { ok: false, reason: 'no QOR transfer from the lead agent to this sub-agent in that transaction' };
+  const who = want.parties ?? { payer: 'the lead agent', payee: 'this sub-agent', before: 'the task was released' };
+  if (paid === 0n) return { ok: false, reason: `no QOR transfer from ${who.payer} to ${who.payee} in that transaction` };
   if (paid < want.minUqor) return { ok: false, reason: `paid ${paid} uqor but ${want.minUqor} uqor is owed` };
 
   // Every native tx on QoreChain must be hybrid-signed; we still check, because this is the post-quantum claim of the product.
@@ -45,7 +46,7 @@ export function evaluatePayment(tx: NativeTx, want: PaymentExpectation): Payment
 
   const timeUnix = Math.floor(Date.parse(res.timestamp) / 1000);
   if (!Number.isFinite(timeUnix)) return { ok: false, reason: 'the receipt has no usable timestamp' };
-  if (timeUnix < want.notBeforeUnix) return { ok: false, reason: 'that payment was made before the task was released' };
+  if (timeUnix < want.notBeforeUnix) return { ok: false, reason: `that payment was made before ${who.before}` };
 
   return { ok: true, paidUqor: paid, height: BigInt(res.height), timeUnix };
 }

@@ -1,10 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
+import { weiAmount } from '../lib/money.js';
 import { db, schema } from '../db/index.js';
 import { requireAgent, requireUser } from '../lib/auth.js';
 import { ensureTask, loadDesignInputs, payoutUrl } from '../chain/ops.js';
 import { legInstructions, reportPayout } from '../chain/payoutReport.js';
+import { fundingInstructions, reportFunding } from '../chain/funding.js';
+import { taskBalance } from '../chain/client.js';
 import { requestDesign } from '../designer/client.js';
 import { dispatchTask, requestQuotes } from '../agents/dispatch.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
@@ -12,7 +15,6 @@ import { readDesignProof } from '../chain/client.js';
 import { compareTerms, sameHash } from '../lib/designProof.js';
 import type { Address } from 'viem';
 
-const tinybarStr = z.string().regex(/^\d+$/, 'tinybar must be a whole-number string');
 const idParam = z.object({ id: z.string().uuid() });
 
 const CHECKS = ['build_config', 'lint_rules', 'secrets_scan', 'dependency_check', 'security_review'] as const;
@@ -25,7 +27,7 @@ export async function marketplaceRoutes(app: FastifyInstance) {
         title: z.string().min(1).max(200),
         requirements: z.string().min(10).max(10000),
         checksRequested: z.array(z.enum(CHECKS)).default([]),
-        budgetTinybar: tinybarStr,
+        budgetTinybar: weiAmount,
         deadlineAt: z.string().datetime().optional(),
       })
       .parse(req.body);
@@ -88,7 +90,7 @@ export async function marketplaceRoutes(app: FastifyInstance) {
   app.post('/requests/:id/quotes', { preHandler: quoteAuth }, async (req, reply) => {
     const { id } = idParam.parse(req.params);
     const body = z
-      .object({ agentId: z.string().uuid().optional(), priceTinybar: tinybarStr, etaHours: z.number().int().positive().optional() })
+      .object({ agentId: z.string().uuid().optional(), priceTinybar: weiAmount, etaHours: z.number().int().positive().optional() })
       .parse(req.body);
 
     const [request] = await db.select().from(schema.requests).where(eq(schema.requests.id, id)).limit(1);
@@ -246,18 +248,24 @@ export async function marketplaceRoutes(app: FastifyInstance) {
     return value;
   });
 
-  // How the client funds the task: by calling fund() from a wallet (QoreX or MetaMask), sending exactly the price in wei.
+  // How the client funds the task: a native QOR transfer from QoreX to the task contract's qor1 address.
   app.get('/agreements/:id/funding', async (req, reply) => {
     const { id } = idParam.parse(req.params);
     const [a] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, id)).limit(1);
     if (!a) return reply.code(404).send({ error: 'Agreement not found' });
     if (!a.escrowAddress) return reply.code(409).send({ error: 'Task contract not deployed yet; retry POST /agreements/:id/escrow' });
-    return {
-      status: a.status,
-      priceTinybar: String(a.priceTinybar),
-      taskContract: a.escrowAddress,
-      wallet: { method: 'fund()', to: a.escrowAddress, valueWei: String(a.priceTinybar), note: 'Amounts are wei (1 QOR = 1e18). The sender needs a registered PQC key and an open EVM window.' },
-    };
+    let balance: bigint;
+    try { balance = await taskBalance(a.escrowAddress as Address); }
+    catch { return reply.code(503).send({ error: 'Could not read the task contract; try again' }); }
+    return { status: a.status, taskContract: a.escrowAddress, ...fundingInstructions(a.escrowAddress as Address, BigInt(a.priceTinybar), balance) };
+  });
+
+  // The client reports the transfer. It is read from the chain and checked; nothing in the request is trusted.
+  app.post('/agreements/:id/funding', async (req, reply) => {
+    const { id } = idParam.parse(req.params);
+    const { txHash } = z.object({ txHash: z.string().min(1) }).parse(req.body);
+    const r = await reportFunding(id, txHash);
+    return reply.code(r.code).send(r.body);
   });
 
   // Where agent A pays each sub-agent after the task is released.

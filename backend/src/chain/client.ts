@@ -4,7 +4,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { env } from '../env.js';
-import { taskEscrowAbi } from './abi.js';
+import { EscrowState, taskEscrowAbi } from './abi.js';
 import { costUqor, isWindowProblem, QoreIdentity, WindowError } from './window.js';
 
 export class ChainError extends Error {}
@@ -36,7 +36,7 @@ function verifierAccount() {
 
 // Explicit gas limits. The 18 Nov smoke test measured 1.65M for createTask and about 100-150k for fund/submit/release; these
 // limits are generous and get re-measured in step 2.3 (the window manager sizes maxValue from gas limit x fee cap).
-const GAS = { addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
+const GAS = { confirmFunding: 200_000n, sweepExcess: 200_000n, refundAfterDeadline: 300_000n, addSubLeg: 500_000n, submit: 300_000n, release: 1_200_000n, refund: 1_200_000n, recordPayout: 400_000n, markDefault: 300_000n } as const;
 
 // The operator sends every backend transaction, so it needs a registered PQC key and a live EVM window (SPEC R3).
 const operator = new QoreIdentity('operator', env.QORE_OPERATOR_PRIVATE_KEY, env.QORE_OPERATOR_PQC_RECOVERY_CODE);
@@ -50,8 +50,15 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function send(args: { address: Address; abi: Abi; functionName: string; args: readonly unknown[]; gas: bigint }) {
+type SendArgs = { address: Address; abi: Abi; functionName: string; args: readonly unknown[]; gas: bigint };
+
+/**
+ * Send one operator transaction (strictly one at a time). `skip` is evaluated inside the queue, right before sending: when it
+ * says the effect already happened, nothing is sent. A reverted transaction is charged its whole gas limit, so we check first.
+ */
+async function submitTx(args: SendArgs, skip?: () => Promise<boolean>) {
   return serial(async () => {
+    if (skip && (await skip())) return null;
     const wallet = createWalletClient({ account: relayerAccount(), chain: qorechainTestnet, transport: http(env.QORE_EVM_RPC_URL, { retryCount: 3, retryDelay: 1500 }) });
     const gasPrice = await publicClient.getGasPrice();
     // Budget the window with a 2x fee-cap margin. Opening a window advances the nonce; viem reads the nonce when it sends.
@@ -78,6 +85,8 @@ async function send(args: { address: Address; abi: Abi; functionName: string; ar
     return { hash, receipt };
   });
 }
+
+const send = async (args: SendArgs) => (await submitTx(args))!; // never null without a skip condition
 
 /** bytes32 id used on-chain for an agreement uuid (the same derivation the Solidity agent uses). */
 export const agreementIdBytes = (uuid: string): Hex => keccak256(toBytes(uuid));
@@ -128,6 +137,26 @@ export async function readDesignProof(task: Address, legCount: number) {
   }
   return { price, deadlineUnix: Number(deadline), maxSubBps: Number(maxSubBps), maxSubLegs: Number(maxSubLegs), payoutGrace: Number(payoutGrace), legs };
 }
+
+/** Mark a natively-paid task funded. Returns null when it is no longer in the Created state (someone already confirmed it). */
+export const confirmFundingOnChain = (task: Address) =>
+  submitTx({ address: task, abi: taskEscrowAbi, functionName: 'confirmFunding', args: [], gas: GAS.confirmFunding },
+    async () => (await readEscrowState(task)) !== EscrowState.Created);
+
+/** After the deadline: return everything to the client (nothing submitted, or only part-paid). Null if already settled. */
+export const refundAfterDeadlineOnChain = (task: Address) =>
+  submitTx({ address: task, abi: taskEscrowAbi, functionName: 'refundAfterDeadline', args: [], gas: GAS.refundAfterDeadline },
+    async () => (await readEscrowState(task)) > EscrowState.Funded);
+
+/** Return leftovers of a settled task to the client. Null when the contract is already empty. */
+export const sweepExcessOnChain = (task: Address) =>
+  submitTx({ address: task, abi: taskEscrowAbi, functionName: 'sweepExcess', args: [], gas: GAS.sweepExcess },
+    async () => (await taskBalance(task)) === 0n);
+
+export const taskBalance = (task: Address) => retryRead(() => publicClient.getBalance({ address: task }));
+
+export const readDeadline = async (task: Address) =>
+  Number(await retryRead(() => publicClient.readContract({ address: task, abi: taskEscrowAbi, functionName: 'deadline' })));
 
 export const submitOnChain = (task: Address, deliverableHash: Hex) =>
   send({ address: task, abi: taskEscrowAbi, functionName: 'submit', args: [deliverableHash], gas: GAS.submit });

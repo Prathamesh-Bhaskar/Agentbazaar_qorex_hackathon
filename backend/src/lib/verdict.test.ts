@@ -35,7 +35,8 @@ describe('verdict uses the designed pass threshold', () => {
 
 describe('agent quote replies', () => {
   it('accepts a price or a refusal and rejects junk', () => {
-    expect(quoteReplySchema.parse({ priceTinybar: '500000', etaHours: 2 }).priceTinybar).toBe('500000');
+    expect(quoteReplySchema.parse({ priceTinybar: '500000000000000000', etaHours: 2 }).priceTinybar).toBe('500000000000000000'); // 0.5 QOR
+    expect(() => quoteReplySchema.parse({ priceTinybar: '500000000000000001' })).toThrow(); // finer than 6 decimals
     expect(quoteReplySchema.parse({ decline: true }).decline).toBe(true);
     expect(() => quoteReplySchema.parse({ priceTinybar: '1.5' })).toThrow();
     expect(() => quoteReplySchema.parse({ priceTinybar: '-5' })).toThrow();

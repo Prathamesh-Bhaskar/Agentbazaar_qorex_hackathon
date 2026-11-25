@@ -160,10 +160,10 @@ export const a2aCalls = pgTable('a2a_calls', {
 export const payments = pgTable('payments', {
   id: uuid('id').primaryKey().defaultRandom(),
   agreementId: uuid('agreement_id').notNull().references(() => agreements.id),
-  kind: text('kind').notNull(), // fund | release | refund | a2a
+  kind: text('kind').notNull(), // fund | release | refund | a2a | excess (overpayment returned to the client)
   amountTinybar: money('amount_tinybar').notNull(),
   txHash: text('tx_hash'),
-  hederaTxId: text('hedera_tx_id'),
+  nativeTx: text('native_tx'), // the user's native funding transfer (kind 'fund')
   payerAccountId: text('payer_account_id'),
   legId: integer('leg_id'), // for kind 'a2a': the contract leg this payment settles
   status: text('status').notNull().default('pending'), // pending | confirmed | failed

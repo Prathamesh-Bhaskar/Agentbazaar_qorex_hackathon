@@ -6,6 +6,7 @@ import type { Address, Hex } from 'viem';
 import { db, schema } from '../db/index.js';
 import { env } from '../env.js';
 import { markDefaultOnChain, publicClient, readTaskTerms } from './client.js';
+import { keepTask, processPendingSweeps, queueSweep } from './funding.js';
 import { blockRanges, fetchTaskLogs } from './logs.js';
 import { legNotFailed, notifyPayoutsDue } from './ops.js';
 import { dispatchTask } from '../agents/dispatch.js';
@@ -40,16 +41,26 @@ async function applyEvent(agreement: Agreement, eventName: string, args: Record<
     case 'Released':
     case 'Refunded': {
       const released = eventName === 'Released';
+      // 'agreed' is included because a part-paid task can be refunded before it was ever funded.
       await db.update(schema.agreements).set({ status: released ? 'released' : 'refunded' })
-        .where(and(eq(schema.agreements.id, agreement.id), inArray(schema.agreements.status, ['funded', 'submitted', 'verifying'])));
+        .where(and(eq(schema.agreements.id, agreement.id), inArray(schema.agreements.status, released ? ['funded', 'submitted', 'verifying'] : ['agreed', 'funded', 'submitted', 'verifying'])));
       const kind = released ? 'release' : 'refund';
       const updated = await db.update(schema.payments)
         .set({ status: 'confirmed', amountTinybar: String(args.amount), txHash })
         .where(and(eq(schema.payments.agreementId, agreement.id), eq(schema.payments.kind, kind), eq(schema.payments.status, 'pending')))
         .returning({ id: schema.payments.id });
       if (updated.length === 0) await db.insert(schema.payments).values({ agreementId: agreement.id, kind, amountTinybar: String(args.amount), txHash, status: 'confirmed' });
+      // A funding row still pending here never became a funding (a part payment that was refunded).
+      await db.delete(schema.payments).where(and(eq(schema.payments.agreementId, agreement.id), eq(schema.payments.kind, 'fund'), eq(schema.payments.status, 'pending')));
+      await queueSweep(agreement.id); // return any overpayment still in the contract
       // A has been paid by the contract; tell it who it now owes and where to pay.
       if (released) void notifyPayoutsDue(agreement.id);
+      break;
+    }
+    case 'ExcessReturned': {
+      // Normally recorded by the keeper from its own receipt; this covers a sweep someone else sent while we still index the task.
+      const [seen] = await db.select({ id: schema.payments.id }).from(schema.payments).where(and(eq(schema.payments.agreementId, agreement.id), eq(schema.payments.txHash, txHash))).limit(1);
+      if (!seen) await db.insert(schema.payments).values({ agreementId: agreement.id, kind: 'excess', amountTinybar: String(args.amount), txHash, status: 'confirmed' });
       break;
     }
     case 'PayoutRecorded':
@@ -118,6 +129,12 @@ export async function indexOnce() {
       seen.add(agreement.id);
       try { await indexTask(agreement); } catch (e) { console.error(`[indexer] ${agreement.escrowAddress}: ${(e as Error).message}`); }
     }
+    // Keeper: confirm paid tasks nobody reported, refund expired ones (QoreX users cannot send these transactions themselves).
+    for (const agreement of active) {
+      if (!agreement.escrowAddress || (agreement.status !== 'agreed' && agreement.status !== 'funded')) continue;
+      try { await keepTask(agreement); } catch (e) { console.error(`[keeper] ${agreement.escrowAddress}: ${(e as Error).message}`); }
+    }
+    await processPendingSweeps();
     await markOverdueDefaults();
   } finally {
     running = false;
