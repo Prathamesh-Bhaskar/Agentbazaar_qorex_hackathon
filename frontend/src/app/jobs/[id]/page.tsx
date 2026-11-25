@@ -6,12 +6,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '@/lib/api';
 import { ago, errMessage, shortAddr } from '@/lib/format';
 import { contractUrl, shortTx, txUrl } from '@/lib/hashscan';
-import { fmtHbar, fmtQor } from '@/lib/money';
+import { fmtHbar } from '@/lib/money';
 import { useDesign, useMe } from '@/lib/queries';
-import { CHECKS, type AgreementDetail, type AgreementStatus, type FundingInfo, type VerificationDetail } from '@/lib/types';
+import { CHECKS, type AgreementDetail, type AgreementStatus, type VerificationDetail } from '@/lib/types';
 import { useSession } from '@/providers/Session';
 import { useToast } from '@/providers/Toasts';
 import ContractDesign, { SubContracts } from '@/components/ContractDesign';
+import FundCard from '@/components/FundCard';
 import Notice, { Empty } from '@/components/Notice';
 import StatusChip from '@/components/StatusChip';
 import { Icon } from '@/components/Icon';
@@ -40,12 +41,6 @@ export default function JobPage() {
     queryFn: () => api<VerificationDetail>(`/agreements/${id}/verification`),
     enabled: !!status && ['submitted', 'verifying', 'released', 'refunded'].includes(status),
     refetchInterval: status && FINAL.includes(status) ? false : 5000,
-  });
-
-  const funding = useQuery({
-    queryKey: ['funding', id],
-    queryFn: () => api<FundingInfo>(`/agreements/${id}/funding`),
-    enabled: status === 'agreed' && !!d?.agreement.escrowAddress,
   });
 
   const design = useDesign(id, !!status && FINAL.includes(status) && (d?.subLegs ?? []).every((l) => l.status !== 'pending'));
@@ -86,13 +81,13 @@ export default function JobPage() {
               !a.escrowAddress ? (
                 <div className="card">
                   <h3>The contract is not deployed yet</h3>
-                  <Notice kind="warn" style={{ marginBottom: 14 }}>{a.escrowError ?? 'Deployment on Hedera did not finish. Nothing was charged.'}</Notice>
+                  <Notice kind="warn" style={{ marginBottom: 14 }}>{a.escrowError ?? 'Deployment on QoreChain did not finish. Nothing was charged.'}</Notice>
                   {isClient
                     ? <button className="btn btn-primary" disabled={!!busy} onClick={() => call('Deploy contract', `/agreements/${id}/escrow`)}>{busy ? 'Deploying…' : 'Retry deploying the contract'}</button>
                     : <p className="muted">Waiting for the client to retry.</p>}
                 </div>
               ) : (
-                <FundCard a={a} funding={funding.data} isClient={isClient} signedIn={session.signedIn} onFunded={refresh} />
+                <FundCard a={a} isClient={isClient} signedIn={session.signedIn} onFunded={refresh} />
               )
             )}
 
@@ -245,18 +240,3 @@ function Timeline({ status }: { status: AgreementStatus }) {
   );
 }
 
-function FundCard({ a, isClient, signedIn }: {
-  a: AgreementDetail['agreement']; funding?: FundingInfo; isClient: boolean; signedIn: boolean; onFunded: () => void;
-}) {
-  const session = useSession();
-  const price = BigInt(a.priceTinybar);
-  if (!signedIn) return <div className="card"><h3>Fund this job</h3><p className="muted" style={{ marginBottom: 14 }}>Log in with the account that posted the job.</p><button className="btn btn-primary" onClick={session.openConnect}><Icon name="lock" />Log in</button></div>;
-  if (!isClient) return <div className="card"><h3>Waiting for funding</h3><p className="muted">The client has to lock {fmtQor(price)} in the contract before the agent starts.</p></div>;
-  return (
-    <div className="card">
-      <h3>Fund this job</h3>
-      <Notice kind="warn">Paying with QoreX from this page is not built yet. It arrives in the next update. Nothing can be sent from here for now.</Notice>
-      <dl className="kv" style={{ marginTop: 14 }}><dt>Price</dt><dd>{fmtQor(price)}</dd><dt>Job contract</dt><dd className="mono" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>{a.escrowAddress}</dd></dl>
-    </div>
-  );
-}

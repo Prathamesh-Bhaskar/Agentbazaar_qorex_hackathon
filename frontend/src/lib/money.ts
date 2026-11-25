@@ -53,3 +53,13 @@ export function fmtQor(wei: string | bigint | number | null | undefined, unit = 
   const s = (a / one).toLocaleString('en-US') + (decimals ? `.${decimals}` : '');
   return (neg ? '−' : '') + s + (unit ? ' QOR' : '');
 }
+
+/** 1 uqor = 1e12 wei: native transfers count QOR with 6 decimals. */
+export const WEI_PER_UQOR = 1_000_000_000_000n;
+
+/** An exact native amount, e.g. 40001 uqor -> "0.040001 QOR". Used where the user pays, so nothing is rounded away. */
+export function fmtUqor(uqor: string | bigint): string {
+  const v = BigInt(uqor);
+  const frac = (v % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return `${(v / 1_000_000n).toLocaleString('en-US')}${frac ? `.${frac}` : ''} QOR`;
+}

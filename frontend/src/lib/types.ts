@@ -181,14 +181,21 @@ export type VerificationDetail = {
   disclaimer: string;
 };
 
+/** GET /agreements/:id/funding: what to send from QoreX to fund the job's contract. */
 export type FundingInfo = {
   status: AgreementStatus;
-  priceTinybar: string;
   taskContract: string;
-  taskAccountId: string | null;
-  x402: { url: string; network: string; asset: string; amountTinybar: string; payTo: string | null };
-  wallet: { method: string; to: string; valueTinybar: string; note: string };
+  /** The contract's qor1 address: the payee of the native transfer. */
+  payTo: string;
+  priceWei: string;
+  amountUqor: string;
+  /** Still missing, in uqor. "0" once the contract holds the price. */
+  shortfallUqor: string;
+  gasLimit: number;
 };
+
+/** POST /agreements/:id/funding */
+export type FundingReport = { funded: boolean; verified?: boolean; status?: AgreementStatus; shortfallUqor?: string; note?: string; error?: string };
 
 export type GithubStatus = { configured: boolean; connected: boolean; login: string | null };
 export type GithubRepo = { fullName: string; url: string; private: boolean; description: string | null; updatedAt: string };

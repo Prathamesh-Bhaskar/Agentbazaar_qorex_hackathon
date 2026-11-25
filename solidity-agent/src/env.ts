@@ -5,10 +5,11 @@ import { z } from 'zod';
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 // Own .env first; the sibling backend .env only fills gaps (keys, NVIDIA settings, shared secret), so nothing is copied around.
 config({ path: here('../.env'), quiet: true });
+const ownPort = process.env.PORT; // read before the backend's .env is loaded: its PORT is the backend's, not ours
 config({ path: here('../../backend/.env'), quiet: true });
 
 const raw = z.object({
-  PORT: z.coerce.number().default(5001),
+  PORT: z.coerce.number().default(5001), // DESIGNER_PORT wins, then this service's own PORT
   // Must equal the backend's SOLIDITY_AGENT_SECRET (the backend sends it in x-agent-secret).
   AGENT_SHARED_SECRET: z.string().optional(),
   SOLIDITY_AGENT_SECRET: z.string().optional(),
@@ -31,6 +32,6 @@ const raw = z.object({
   NVIDIA_API_KEY: z.string().optional(),
   NVIDIA_BASE_URL: z.string().default('https://integrate.api.nvidia.com/v1'),
   NVIDIA_MODEL: z.string().default('nvidia/nemotron-3.5-super-vl-120b-a12b'),
-}).parse(process.env);
+}).parse({ ...process.env, PORT: process.env.DESIGNER_PORT ?? ownPort });
 
 export const env = { ...raw, AGENT_SHARED_SECRET: raw.AGENT_SHARED_SECRET ?? raw.SOLIDITY_AGENT_SECRET };

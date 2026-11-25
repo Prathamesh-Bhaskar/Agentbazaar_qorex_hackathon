@@ -1,6 +1,7 @@
 // The QoreX wallet connector (SPEC-qorechain R6). QoreX injects `window.qorex.native`; the page asks it to sign a message or to send
 // native messages, and the wallet shows each request to the user. The page never holds a key.
 import { getQorexNative, hasCapability, QOREX_DOWNLOAD_URLS, type QorexNativeProvider } from '@qorechain/qorex-types';
+import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx';
 
 export const QORE_CHAIN_ID = 'qorechain-diana';
 export const QORE_NETWORK_NAME = 'QoreChain testnet';
@@ -62,4 +63,20 @@ export async function signText(provider: QorexNativeProvider, account: Account, 
   const sign = provider.signArbitrary as unknown as (chainId: string, signer: string, data: string) => Promise<unknown>;
   try { return await sign.call(provider, QORE_CHAIN_ID, account.qor, message); }
   catch (e) { throw walletFailure(e); }
+}
+
+export type TransferResult = { txHash: string; code: number };
+
+/**
+ * Ask QoreX to send `amountUqor` to `to` as a native transfer. The wallet shows it, sets the fee, adds the hybrid
+ * secp256k1 + ML-DSA-87 signature and broadcasts. The message bytes are passed as a plain number array (tested in a browser).
+ */
+export async function sendQor(provider: QorexNativeProvider, account: Account, to: string, amountUqor: bigint, gasLimit: number): Promise<TransferResult> {
+  const value = MsgSend.encode(MsgSend.fromPartial({ fromAddress: account.qor, toAddress: to, amount: [{ denom: 'uqor', amount: amountUqor.toString() }] })).finish();
+  let r: TransferResult;
+  try {
+    r = await provider.signAndBroadcast({ chainId: QORE_CHAIN_ID, messages: [{ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: Array.from(value) }], gasLimit });
+  } catch (e) { throw walletFailure(e); }
+  if (r.code !== 0) throw new WalletError(`QoreChain rejected the transfer (code ${r.code}). Nothing was paid, apart from the network fee.`, 'failed');
+  return r;
 }
