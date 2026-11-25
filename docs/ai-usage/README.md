@@ -6,3 +6,4 @@ Planning notes and prompts used while building. The summary is in the root `AI_U
 - 2026-11-17: Phase 0 on testnet: PQC key registration, hybrid-signed EVM window, first deploy.
 - 2026-11-18: Phase 1: contracts in wei, `payoutRef`, factory deploy and a full escrow cycle on chain 9800.
 - 2026-11-18/19: Phase 2: QoreChain chain client, EVM window manager, eth_getLogs indexer, NVIDIA-only AI layer; indexer verified against the live testnet on a fresh database.
+- 2026-11-25/26: QoreX browser tests (native transfers, message signing); amendment A1: new contract, funding and sign-in backend, each verified on testnet.

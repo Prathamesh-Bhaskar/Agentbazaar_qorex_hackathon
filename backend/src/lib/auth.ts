@@ -5,10 +5,6 @@ import { db, schema } from '../db/index.js';
 
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
-export function loginMessage(address: string, nonce: string): string {
-  return `AgentForge login\nAddress: ${address.toLowerCase()}\nNonce: ${nonce}`;
-}
-
 export const newToken = (bytes = 32) => randomBytes(bytes).toString('hex');
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 

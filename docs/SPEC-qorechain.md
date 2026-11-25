@@ -48,6 +48,8 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | QoreX `signArbitrary` signs a text for a web page and returns a hybrid signature (`ml-dsa-87-hybrid`); `verifyMessageWithChain` from `@qorechain/qoresign` 0.1.0 with `requirePq` accepted the genuine one against the key registered on chain and refused a changed message, another account and a signature without the ML-DSA-87 part. No transaction and no fee | browser run 25 Nov, `backend/scripts/qore/qorex-test-server.mjs` |
 | New factory (amendment A1) verified on chain: a native hybrid-signed transfer of 0.21 QOR to a 0.2 QOR task raised its balance; `confirmFunding`, `submit`, `release` paid the agent exactly 0.2 QOR; `sweepExcess` returned 0.01 QOR to the client (`ExcessReturned`); contract empty, state Released; `createTask` gas 1,821,631 | factory `0xf7b32D5AD9A691863E50af2E2A3F6decFF695BB4` (tx `0xb3efb321…2a12`), task `0x582369836C0DB1C496530b8E9243fB8EA453A9a7`, `backend/scripts/qore/smoke.mjs`, 25 Nov |
 | Funding backend (R12) end to end with the real server, indexer and keeper on testnet and the database: a 0.05 QOR part payment answered `funded=false`, shortfall 150,000 uqor; another account's payment was refused (422); a top-up funded the job and the indexer kept both the client's tx and the confirm tx; release paid the lead exactly 0.2 QOR and 0.011 QOR excess was returned; an unreported full payment was confirmed by the keeper and refunded after the deadline with nothing delivered; a part-paid job was refunded (0.04 QOR) after its deadline; no keeper or indexer errors, 14 checks passed | tasks `0x8f262c4b…5f0f`, `0x0eb08a3a…4dad`, `0x697a6d48…f698`, 25 Nov |
+| QoreX signs a Sign In With QoreChain text as a plain message: `verifySiwqWithChain` refuses its post-quantum part (the library expects the `qorechain-siwq-v1|` prefix), while `verifyMessageWithChain` over the same text plus our own site, nonce, chain, account and expiry checks accepts it and refuses a wrong nonce, wrong site, expired, altered or classical-only attempt | browser run 25 Nov (Q8) |
+| Sign-in backend (R11) with the real server: sign-in 200 with a session, replay refused (`bad_nonce`), another account's signature refused (401), classical-only refused (400), an account without a registered key told how to register (403 `no_pqc_key`) | live run 25 Nov, test accounts signing as QoreX does |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -197,10 +199,13 @@ and a cross-VM call cannot carry value into the EVM lane (section 2).
 - All other invariants unchanged. Tests cover exact, partial, over and late payment, double confirm and sweep.
 
 **R11 Sign in with QoreX (replaces wallet-nonce login with MetaMask).** The backend issues a nonce and a Sign In With
-QoreChain message (`createSiwqMessage`: domain, address, uri, chain id, nonce, issued-at, 5 minute expiry). The page signs it
-with `signArbitrary`. The backend verifies it with `verifySiwqWithChain`, `requirePq` on; the nonce is single use. The user
-record stays keyed by the lowercase `0x` form of the same 20 bytes. An account with no registered PQC key is told to make any
-first transaction in QoreX (which registers it). The optional password second factor is unchanged. Open: Q8.
+QoreChain text (`createSiwqMessage`: web app domain and uri, account, chain id, nonce, issued-at, 5 minute expiry). The page
+signs it with `signArbitrary`. The backend rebuilds the text from the stored nonce (never trusting a client copy) and
+verifies the hybrid signature with `verifyMessageWithChain`, `requirePq` on, against the key registered on chain. The nonce
+is single use. A chain that cannot be reached answers 503, never "bad signature". The user record stays keyed by the
+lowercase `0x` form of the same 20 bytes. An account with no registered PQC key is told to make any first transaction in
+QoreX. The optional password second factor is unchanged. Known limit: as with other wallet sign-ins, the wallet does not
+check that the requesting page matches the domain in the text, so users must read it.
 
 **R12 Funding by native transfer.** The job page asks QoreX to send `price` in uqor to the task contract's `qor1` form
 (`signAndBroadcast`, gas limit 300,000, about 0.045 QOR fee, shown to the user). The page reports the tx hash to
@@ -222,8 +227,7 @@ the price; an overpayment returns to the client.
 
 **Open questions**
 - **Q7** URL format of a transaction and an address on `explore.qore.network`.
-- **Q8** Whether `verifySiwqWithChain` accepts the signature `signArbitrary` returns over a `createSiwqMessage` text
-  (plain-message verification is proven; the SIWQ wrapper is not yet tried).
+- **Q8** ANSWERED 25 Nov: it does not; the plain-message verifier is used (R11).
 
 **Plan** (today 25 Nov): contracts, tests and redeploy 26 Nov; backend sign-in and funding 26-27; frontend 27-29; full
 end-to-end 30; README and video 1 Dec; submit 2 Dec. The stretch goal R9 is dropped unless time remains.

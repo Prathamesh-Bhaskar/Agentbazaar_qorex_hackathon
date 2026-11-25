@@ -1,47 +1,49 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, gt, ne } from 'drizzle-orm';
-import { isAddress, verifyMessage } from 'viem';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
-import { createSession, loginMessage, newToken, requireUser } from '../lib/auth.js';
+import { createSession, newToken, requireUser } from '../lib/auth.js';
+import { checkSignature, SIGN_IN_TTL_MS, signInMessage, walletAddress, walletSignature } from '../lib/signIn.js';
+import { evmToQor } from '@qorechain/sdk';
 import { hashPassword, loginThrottle, passwordProblem, verifyPassword } from '../lib/password.js';
 
 const email = z.string().trim().toLowerCase().email().max(254);
 const role = z.enum(['client', 'lister', 'both']);
-const signed = z.object({ address: z.string(), nonce: z.string(), signature: z.string() });
+const signed = z.object({ address: z.string(), nonce: z.string(), signature: walletSignature }); // signature: QoreX signArbitrary
 
 type User = typeof schema.users.$inferSelect;
 /** What the API may show about a user. Never the password hash. */
 const publicUser = (u: User) => ({
-  id: u.id, address: u.address, displayName: u.displayName, email: u.email, role: u.role,
+  id: u.id, address: u.address, qorAddress: evmToQor(u.address), displayName: u.displayName, email: u.email, role: u.role,
   hederaAccountId: u.hederaAccountId, createdAt: u.createdAt, hasPassword: !!u.passwordHash,
 });
 
-/** Check the one-time nonce and the wallet signature. Burns the nonce. Returns the lowercased address. */
+/** Check the one-time nonce and the QoreX signature over our sign-in text. Burns the nonce. Returns the user key (0x form). */
 async function checkWallet(body: z.infer<typeof signed>): Promise<{ addr: string } | { status: number; error: string; code: string }> {
-  if (!isAddress(body.address)) return { status: 400, error: 'Invalid address', code: 'bad_address' };
-  const addr = body.address.toLowerCase();
-  const rows = await db.select().from(schema.authNonces)
-    .where(and(eq(schema.authNonces.address, addr), eq(schema.authNonces.nonce, body.nonce), eq(schema.authNonces.used, false), gt(schema.authNonces.expiresAt, new Date())))
-    .limit(1);
-  if (!rows[0]) return { status: 400, error: 'Unknown, used or expired nonce', code: 'bad_nonce' };
-  const ok = await verifyMessage({ address: addr as `0x${string}`, message: loginMessage(addr, body.nonce), signature: body.signature as `0x${string}` }).catch(() => false);
-  if (!ok) return { status: 401, error: 'Bad signature', code: 'bad_signature' };
-  await db.update(schema.authNonces).set({ used: true }).where(and(eq(schema.authNonces.address, addr), eq(schema.authNonces.nonce, body.nonce)));
-  return { addr };
+  const wallet = walletAddress(body.address);
+  if (!wallet) return { status: 400, error: 'Invalid address', code: 'bad_address' };
+  const unused = and(eq(schema.authNonces.address, wallet.hex), eq(schema.authNonces.nonce, body.nonce), eq(schema.authNonces.used, false), gt(schema.authNonces.expiresAt, new Date()));
+  const [row] = await db.select().from(schema.authNonces).where(unused).limit(1);
+  if (!row) return { status: 400, error: 'Unknown, used or expired nonce', code: 'bad_nonce' };
+  const failure = await checkSignature(wallet.qor, signInMessage({ qor: wallet.qor, nonce: row.nonce, expiresAt: row.expiresAt }), body.signature);
+  if (failure) return failure;
+  // Burn it in one statement, so two requests with the same signature cannot both succeed.
+  const burned = await db.update(schema.authNonces).set({ used: true }).where(unused).returning({ nonce: schema.authNonces.nonce });
+  if (!burned.length) return { status: 400, error: 'Unknown, used or expired nonce', code: 'bad_nonce' };
+  return { addr: wallet.hex };
 }
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/nonce', async (req, reply) => {
     const { address } = z.object({ address: z.string() }).parse(req.body);
-    if (!isAddress(address)) return reply.code(400).send({ error: 'Invalid address' });
-    const addr = address.toLowerCase();
+    const wallet = walletAddress(address);
+    if (!wallet) return reply.code(400).send({ error: 'Invalid address' });
     const nonce = newToken(16);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await db.insert(schema.authNonces).values({ address: addr, nonce, expiresAt });
+    const expiresAt = new Date(Date.now() + SIGN_IN_TTL_MS);
+    await db.insert(schema.authNonces).values({ address: wallet.hex, nonce, expiresAt });
     // Tells the page whether to ask for a password. (An address is public, so this reveals nothing secret.)
-    const [user] = await db.select({ passwordHash: schema.users.passwordHash }).from(schema.users).where(eq(schema.users.address, addr)).limit(1);
-    return { nonce, message: loginMessage(addr, nonce), expiresAt, isNew: !user, passwordRequired: !!user?.passwordHash };
+    const [user] = await db.select({ passwordHash: schema.users.passwordHash }).from(schema.users).where(eq(schema.users.address, wallet.hex)).limit(1);
+    return { nonce, message: signInMessage({ qor: wallet.qor, nonce, expiresAt }), expiresAt, isNew: !user, passwordRequired: !!user?.passwordHash };
   });
 
   // Log in: wallet signature, plus the password if this account has one.
