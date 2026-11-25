@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentBazaar · QoreX browser test</title>
+<style>
+  body { font: 15px/1.55 system-ui, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; background: #0b0b14; color: #eee; }
+  button { font: inherit; padding: 9px 16px; border: 0; border-radius: 6px; background: #8b3cf7; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  section { border: 1px solid #2a2a40; border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+  pre { white-space: pre-wrap; word-break: break-all; background: #14141f; padding: 12px; border-radius: 6px; min-height: 3em; }
+  .muted { color: #9a9ab0; }
+</style>
+</head>
+<body>
+<h1>QoreX browser test</h1>
+<p class="muted">Testnet only (<code>qorechain-diana</code>). In QoreX, switch to testnet first. Each send asks for your approval in the wallet and costs a small fee in test QOR.</p>
+
+<section>
+  <b>1. Connect</b>
+  <p><button id="connect">Connect QoreX</button></p>
+</section>
+<section>
+  <b>2. Login test</b> — sends <b>0.000001 QOR to yourself</b> with a one-time code in the memo.
+  <p><button id="login" disabled>Send login transaction</button></p>
+</section>
+<section>
+  <b>3. Funding test</b> — sends <b>0.01 QOR to the project's operator account</b>, the same kind of transfer that would fund a job.
+  <p><button id="fund" disabled>Send 0.01 QOR</button></p>
+</section>
+
+<h3>Result log</h3>
+<pre id="log"></pre>
+<p><button id="copy">Copy log</button> <span class="muted">Paste it back in the chat. It holds only addresses and transaction hashes.</span></p>
+
+<script>
+const CHAIN = 'qorechain-diana';
+const OPERATOR = 'qor10n4vu9vng7ta6xagjefrkgfm00l83x7n7r66fn'; // project operator account (public address)
+const $ = (id) => document.getElementById(id);
+const log = (...a) => { $('log').textContent += a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ') + '\n'; };
+let me = null;
+
+// --- minimal protobuf encoding of cosmos.bank.v1beta1.MsgSend (checked against cosmjs-types) ---
+const utf8 = (s) => Array.from(new TextEncoder().encode(s));
+const varint = (n) => { const out = []; do { let b = n & 0x7f; n >>>= 7; if (n) b |= 0x80; out.push(b); } while (n); return out; };
+const field = (num, bytes) => [...varint((num << 3) | 2), ...varint(bytes.length), ...bytes];
+const msgSend = (from, to, uqor) => [...field(1, utf8(from)), ...field(2, utf8(to)), ...field(3, [...field(1, utf8('uqor')), ...field(2, utf8(uqor))])];
+
+const provider = () => window.qorex && window.qorex.native;
+
+$('connect').onclick = async () => {
+  try {
+    const p = provider();
+    if (!p) { log('FAIL: window.qorex.native is not here. Is the QoreX extension installed and enabled for this page?'); return; }
+    log('QoreX found. capabilities:', Array.from(p.capabilities || []));
+    if (!(p.capabilities || []).includes('signAndBroadcast')) { log('FAIL: this QoreX build cannot signAndBroadcast. Update to 0.3.5 or later.'); return; }
+    await p.enable(CHAIN);
+    const key = await p.getKey(CHAIN);
+    me = key.bech32Address;
+    const hex = '0x' + Array.from(key.address, (b) => b.toString(16).padStart(2, '0')).join('');
+    log('connected:', me);
+    log('20-byte address (EVM form):', hex, '| algo:', key.algo);
+    $('login').disabled = false; $('fund').disabled = false;
+  } catch (e) { log('connect FAILED:', String((e && e.message) || e)); }
+};
+
+async function send(label, to, uqor, memo) {
+  $('login').disabled = true; $('fund').disabled = true;
+  const started = Date.now();
+  try {
+    log(label + ': asking QoreX… memo=' + memo);
+    const r = await provider().signAndBroadcast({
+      chainId: CHAIN,
+      messages: [{ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: msgSend(me, to, uqor) }],
+      memo,
+      gasLimit: 300000,
+    });
+    log(label + ' result:', { txHash: r.txHash, code: r.code, height: r.height, shield: r.shield, seconds: Math.round((Date.now() - started) / 1000) });
+  } catch (e) { log(label + ' FAILED:', String((e && e.message) || e)); }
+  $('login').disabled = false; $('fund').disabled = false;
+}
+
+const nonce = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+$('login').onclick = () => send('login', me, '1', 'agentbazaar-login:' + nonce());
+$('fund').onclick = () => send('fund', OPERATOR, '10000', 'agentbazaar-test:fund');
+$('copy').onclick = () => navigator.clipboard.writeText($('log').textContent);
+window.addEventListener('load', () => setTimeout(() => log(provider() ? 'page ready: QoreX detected' : 'page ready: QoreX not detected yet'), 600));
+</script>
+</body>
+</html>
