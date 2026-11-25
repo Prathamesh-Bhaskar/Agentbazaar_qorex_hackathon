@@ -31,7 +31,7 @@
 </section>
 
 <section>
-  <b>4. Free signature test</b> — signs a text message only. No transaction, no fee.
+  <b>4. Free signature test</b> — signs a text message only, then this local server verifies it. No transaction, no fee.
   <p><button id="sign" disabled>Sign a login message</button></p>
 </section>
 
@@ -94,7 +94,10 @@ $('sign').onclick = async () => {
   try {
     log('sign: asking QoreX to sign the text ' + message);
     const r = await provider().signArbitrary(CHAIN, me, message);
-    log('sign result:', r); // a signature and a public key: neither is secret
+    log('signed. type:', r.signatureType, '| post-quantum signature included:', Boolean(r.pq && r.pq.signature));
+    const v = await fetch('/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signer: me, message, signature: r }) });
+    if (!v.ok) { log('verify: this server cannot verify (' + v.status + '). Start it with: node scripts/qore/qorex-test-server.mjs'); return; }
+    for (const [k, x] of Object.entries(await v.json())) log('verify ' + k + ':', x);
   } catch (e) { log('sign FAILED:', String((e && e.message) || e)); }
 };
 $('copy').onclick = () => navigator.clipboard.writeText($('log').textContent);
