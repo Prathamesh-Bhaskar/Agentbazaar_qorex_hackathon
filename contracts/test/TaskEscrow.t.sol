@@ -5,6 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {TaskFactory} from "../src/TaskFactory.sol";
 import {TaskEscrow} from "../src/TaskEscrow.sol";
 
+/// A client address that refuses plain value transfers.
+contract RejectsValue {}
+
 contract TaskEscrowTest is Test {
     TaskFactory factory;
     TaskEscrow task;
@@ -77,8 +80,129 @@ contract TaskEscrowTest is Test {
         task.fund{value: PRICE}();
     }
 
+    // ---------- funding by native transfer (QoreX): the balance rises without any code running ----------
+    function _nativeTransfer(uint256 amount) internal { vm.deal(address(task), address(task).balance + amount); }
+
+    function test_confirmFunding_exactAmount() public {
+        _nativeTransfer(PRICE);
+        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Created));
+        vm.expectEmit(address(task));
+        emit TaskEscrow.Funded(AID, client, PRICE);
+        task.confirmFunding();
+        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Funded));
+    }
+
+    function test_confirmFunding_underpaidThenToppedUp() public {
+        _nativeTransfer(PRICE - 1);
+        vm.expectRevert(TaskEscrow.NotFunded.selector);
+        task.confirmFunding();
+        _nativeTransfer(1);
+        task.confirmFunding();
+        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Funded));
+    }
+
+    function test_confirmFunding_onlyOnceAndNotAfterWalletFunding() public {
+        _fundWallet();
+        vm.expectRevert(TaskEscrow.WrongState.selector);
+        task.confirmFunding();
+    }
+
+    function test_confirmFunding_refusedAfterDeadline() public {
+        _nativeTransfer(PRICE);
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.expectRevert(TaskEscrow.TooLate.selector);
+        task.confirmFunding();
+        uint256 before = client.balance;
+        task.refundAfterDeadline(); // the money is not stranded
+        assertEq(client.balance - before, PRICE);
+    }
+
+    function test_overpayment_agentGetsExactlyPrice_clientGetsTheRest() public {
+        _nativeTransfer(PRICE + 3 ether);
+        task.confirmFunding();
+        uint256 agentBefore = agentA.balance;
+        uint256 clientBefore = client.balance;
+        vm.expectRevert(TaskEscrow.WrongState.selector); // nothing can be swept while the task is open
+        task.sweepExcess();
+        _submitAndRelease();
+        assertEq(agentA.balance - agentBefore, PRICE);
+        assertEq(address(task).balance, 3 ether);
+        vm.expectEmit(address(task));
+        emit TaskEscrow.ExcessReturned(AID, client, 3 ether);
+        task.sweepExcess();
+        assertEq(client.balance - clientBefore, 3 ether);
+        assertEq(address(task).balance, 0);
+        vm.expectRevert(TaskEscrow.NothingToReturn.selector);
+        task.sweepExcess();
+    }
+
+    function test_walletFundAfterPartTransfer_excessReturned() public {
+        _nativeTransfer(1 ether);
+        _fundWallet();
+        _submitAndRelease();
+        uint256 before = client.balance;
+        task.sweepExcess();
+        assertEq(client.balance - before, 1 ether);
+    }
+
+    function test_lateTransferAfterRefundIsReturned() public {
+        _fundWallet();
+        vm.warp(block.timestamp + 1 days + 1);
+        task.refundAfterDeadline();
+        _nativeTransfer(2 ether);
+        uint256 before = client.balance;
+        task.sweepExcess();
+        assertEq(client.balance - before, 2 ether);
+    }
+
+    function test_partPaidTaskRefundedAfterDeadline() public {
+        _nativeTransfer(PRICE / 2);
+        vm.expectRevert(TaskEscrow.TooEarly.selector);
+        task.refundAfterDeadline();
+        vm.warp(block.timestamp + 1 days + 1);
+        uint256 before = client.balance;
+        task.refundAfterDeadline();
+        assertEq(client.balance - before, PRICE / 2);
+        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Refunded));
+    }
+
+    function test_unpaidTaskCannotBeMarkedRefunded() public {
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.expectRevert(TaskEscrow.NotFunded.selector);
+        task.refundAfterDeadline();
+        assertEq(uint8(task.state()), uint8(TaskEscrow.State.Created));
+    }
+
+    function test_failVerdictReturnsEverythingIncludingExcess() public {
+        _nativeTransfer(PRICE + 1 ether);
+        task.confirmFunding();
+        vm.prank(agentA);
+        task.submit(bytes32(0));
+        bytes memory sig = _verdict(0, 11);
+        uint256 before = client.balance;
+        task.refund(11, sig);
+        assertEq(client.balance - before, PRICE + 1 ether);
+    }
+
+    function test_clientThatRejectsValueCannotBlockTheAgent() public {
+        RejectsValue stubborn = new RejectsValue();
+        vm.prank(designer);
+        TaskEscrow t = TaskEscrow(factory.createTask(keccak256("agreement-r"), address(stubborn), agentA, PRICE, uint64(block.timestamp + 1 days), MAX_SUB_BPS, MAX_SUB_LEGS, GRACE, TERMS));
+        vm.deal(address(t), PRICE + 1 ether);
+        t.confirmFunding();
+        vm.prank(agentA);
+        t.submit(bytes32(0));
+        bytes32 structHash = keccak256(abi.encode(keccak256("Verdict(bytes32 agreementId,uint8 result,uint256 nonce)"), keccak256("agreement-r"), uint8(1), uint256(5)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(verifierKey, keccak256(abi.encodePacked("\x19\x01", t.domainSeparator(), structHash)));
+        uint256 before = agentA.balance;
+        t.release(5, abi.encodePacked(r, s, v));
+        assertEq(agentA.balance - before, PRICE);
+        vm.expectRevert(TaskEscrow.TransferFailed.selector); // only the client's own leftover is stuck, not the agent's money
+        t.sweepExcess();
+    }
+
     // ---------- settlement ----------
-    function test_release_paysAgentAWholeBalance() public {
+    function test_release_paysAgentExactlyThePrice() public {
         _fundWallet();
         uint256 before = agentA.balance;
         _submitAndRelease();

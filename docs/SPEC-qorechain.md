@@ -179,7 +179,7 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 - Backend signing keys for PQC identities (recovery codes) are secrets that must be backed up outside the repo.
 - The public testnet is rate limited per IP; the indexer must poll gently and back off.
 
-## 9. Amendment A1: QoreX-only web app (APPROVAL PENDING)
+## 9. Amendment A1: QoreX-only web app (APPROVED by the user, 25 Nov)
 
 Chosen by the user on 25 Nov (option 1). It replaces R6 and the MetaMask funding path of R2, and adds R11 and R12.
 Why: from a web page QoreX can sign messages and native transfers, but cannot sign EVM transactions or open EVM windows,

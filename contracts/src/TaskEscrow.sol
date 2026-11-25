@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 /// @notice ONE contract for a whole task: client -> agent A (root leg 0) and agent A -> agent B (sub-legs, max 2 hops).
-/// The client's QOR is locked here. After a verified PASS the contract pays A. A then pays each sub-agent B with a
+/// The client's QOR is locked here (fund() from a key, or a native transfer followed by confirmFunding()). After a verified PASS
+/// the contract pays A exactly the price. A then pays each sub-agent B with a
 /// hybrid-signed (secp256k1 + ML-DSA-87) native QOR transfer made outside this contract; the backend verifies that
 /// transfer on chain and records its transaction hash with recordPayout(). Anything A does not pay within
 /// `payoutGrace` is marked Defaulted on-chain.
@@ -72,6 +73,7 @@ contract TaskEscrow {
     /// @param payoutRef the QoreChain transaction hash of A's payment to the sub-agent (hex, as the explorer shows it)
     event PayoutRecorded(bytes32 indexed agreementId, uint256 legId, address payee, uint256 price, string payoutRef);
     event PayoutDefaulted(bytes32 indexed agreementId, uint256 legId, address debtor, address payee, uint256 price);
+    event ExcessReturned(bytes32 indexed agreementId, address client, uint256 amount);
 
     error WrongState();
     error NotAllowed();
@@ -83,6 +85,9 @@ contract TaskEscrow {
     error CapExceeded();
     error TooManyLegs();
     error BadLeg();
+    error NotFunded();
+    error TooLate();
+    error NothingToReturn();
 
     constructor(Terms memory t) {
         agreementId = t.agreementId;
@@ -107,6 +112,17 @@ contract TaskEscrow {
         if (msg.value != price) revert WrongAmount();
         state = State.Funded;
         emit Funded(agreementId, client, msg.value);
+    }
+
+    /// @notice Native-transfer path (QoreX): the client sends QOR to this contract's qor1 address with a bank transfer, which
+    /// raises the balance without running any code. Once the balance covers the price, anyone may call this to mark the task
+    /// funded. Anything above the price stays here until sweepExcess() returns it to the client.
+    function confirmFunding() external {
+        if (state != State.Created) revert WrongState();
+        if (block.timestamp > deadline) revert TooLate();
+        if (address(this).balance < price) revert NotFunded();
+        state = State.Funded;
+        emit Funded(agreementId, client, price);
     }
 
     // ---------------- A -> B legs (max 2 hops: client->A, A->B) ----------------
@@ -141,16 +157,15 @@ contract TaskEscrow {
     }
 
     // ---------------- settlement ----------------
-    /// @notice PASS verdict for the whole task (A's result including B's part): the contract pays A everything it holds.
+    /// @notice PASS verdict for the whole task (A's result including B's part): the contract pays A exactly the price.
     function release(uint256 nonce, bytes calldata sig) external {
         if (state != State.Submitted) revert WrongState();
         _checkVerdict(PASS, nonce, sig);
         state = State.Released;
         releasedAt = uint64(block.timestamp);
         _legs[0].status = LegStatus.Paid;
-        uint256 amount = address(this).balance;
-        emit Released(agreementId, agent, amount);
-        _send(agent, amount);
+        emit Released(agreementId, agent, price);
+        _send(agent, price);
     }
 
     /// @notice FAIL verdict: everything goes back to the client. Sub-legs are voided (owed() turns false).
@@ -160,11 +175,23 @@ contract TaskEscrow {
         _refundClient();
     }
 
-    /// @notice Escape hatch: nothing was submitted before the deadline.
+    /// @notice Escape hatch after the deadline: nothing was submitted, or the task was only part-paid and never funded.
+    /// Everything the contract holds goes back to the client.
     function refundAfterDeadline() external {
-        if (state != State.Funded) revert WrongState();
+        if (state != State.Funded && state != State.Created) revert WrongState();
         if (block.timestamp <= deadline) revert TooEarly();
+        if (state == State.Created && address(this).balance == 0) revert NotFunded(); // an unpaid task is not "refunded"
         _refundClient();
+    }
+
+    /// @notice Return anything left over once the task is settled (an overpayment, or money that arrived late) to the client.
+    /// Separate from release() on purpose: a client address that rejects value can never block the agent's payment.
+    function sweepExcess() external {
+        if (state != State.Released && state != State.Refunded) revert WrongState();
+        uint256 amount = address(this).balance;
+        if (amount == 0) revert NothingToReturn();
+        emit ExcessReturned(agreementId, client, amount);
+        _send(payable(client), amount);
     }
 
     // ---------------- A pays B with a native QOR transfer (outside the contract), recorded here ----------------

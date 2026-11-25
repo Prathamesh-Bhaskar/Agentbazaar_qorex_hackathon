@@ -3,8 +3,10 @@
 Solidity 0.8.24, Foundry. One contract per task covers the whole chain: client -> agent A -> sub-agent B (max 2 hops).
 
 - `TaskFactory`: only the designer (the Solidity agent's wallet) can deploy; it enforces hard bounds on the dynamic terms.
-- `TaskEscrow`: locks the client's QOR. Funding is `fund()` from a wallet (QoreX or MetaMask). After a verified PASS it
-  pays A (`release`); FAIL or a missed deadline refunds the client. A -> B legs (`addSubLeg`) are paid by A with a
+- `TaskEscrow`: locks the client's QOR. Funding is a native transfer to the contract's `qor1` address followed by
+  `confirmFunding()` (the QoreX web path), or `fund()` from a key. After a verified PASS it pays A exactly the price
+  (`release`); FAIL or a missed deadline (including a part-paid task) refunds the client. `sweepExcess()` returns any
+  overpayment or late money to the client once the task is settled. A -> B legs (`addSubLeg`) are paid by A with a
   hybrid-signed native QOR transfer after release; the operator records that transfer's tx hash (`recordPayout`) once the
   backend has verified it on chain, and an unpaid debt is marked defaulted after the grace period (`markDefault`).
 
