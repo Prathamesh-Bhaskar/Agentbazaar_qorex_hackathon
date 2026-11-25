@@ -2,12 +2,18 @@
   "qorechainTestnet": {
     "chainId": 9800,
     "TaskFactory": {
-      "address": "0x83CD43960C3634bfCc63D22C971Aa2f9c8477719",
-      "deployTx": "0xeae1756116173ec621002abff40e5256e77c2ec003d099d31f443c99a5d72540",
+      "address": "0xf7b32D5AD9A691863E50af2E2A3F6decFF695BB4",
+      "deployTx": "0xb3efb32178c86ab2eb16128e29bfc53d3f2b59d073886aa904dce0a83cb92a12",
       "owner": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3",
       "designer": "0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9",
       "operator": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3",
       "verifier": "0xaD35905450242d327dd101A51CE0c040098B493f"
-    }
+    },
+    "superseded": [
+      {
+        "address": "0x83CD43960C3634bfCc63D22C971Aa2f9c8477719",
+        "note": "first deployment: no confirmFunding, release paid the whole balance"
+      }
+    ]
   }
 }
