@@ -45,6 +45,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | A native hybrid-signed `MsgSend` to a task contract's `qor1…` form raises the contract's EVM balance (0 -> exactly 0.1 QOR) | tx `C9C2DAA1675150174C5467C5C913868AC348D6759B625E894DE16A0357BC87F2`, test task `0x9763d98057f4e1e10F4e46CCc64fb2ad1Ff9C78b` |
 | From the published package docs (not yet tried in a browser): QoreX's EVM provider only connects (no signing yet); its native provider `signAndBroadcast`s messages for a page, including `MsgSend`, and registers the PQC key itself, but refuses `MsgOpenEVMWindow`, key messages and `signArbitrary` | READMEs of `@qorechain/qorex-types` 0.1.0 and `@qorechain/wallet-adapter` 0.6.0 |
 | In a real browser, QoreX `signAndBroadcast` works for a page on `http://localhost`: a self-transfer of 1 uqor with a memo and a 10,000 uqor transfer both committed with code 0, `shield: shielded`, about 6 s each; receipts show one `MsgSend`, the memo kept exactly, one signer (`cosmos.crypto.secp256k1.PubKey`, so a coin-type-118 account) and the ML-DSA-87 extension; fee 45,000 uqor at a 300,000 gas limit (about 168k used) | txs `E6001C7A…D06E` (login), `F5A45865…3AE7` (funding), 25 Nov |
+| QoreX `signArbitrary` signs a text for a web page and returns a hybrid signature (`ml-dsa-87-hybrid`); `verifyMessageWithChain` from `@qorechain/qoresign` 0.1.0 with `requirePq` accepted the genuine one against the key registered on chain and refused a changed message, another account and a signature without the ML-DSA-87 part. No transaction and no fee | browser run 25 Nov, `backend/scripts/qore/qorex-test-server.mjs` |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -177,3 +178,50 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 - QoreChain docs disagree across pages on chain versions; every behaviour above is to be re-tested before relying on it.
 - Backend signing keys for PQC identities (recovery codes) are secrets that must be backed up outside the repo.
 - The public testnet is rate limited per IP; the indexer must poll gently and back off.
+
+## 9. Amendment A1: QoreX-only web app (APPROVAL PENDING)
+
+Chosen by the user on 25 Nov (option 1). It replaces R6 and the MetaMask funding path of R2, and adds R11 and R12.
+Why: from a web page QoreX can sign messages and native transfers, but cannot sign EVM transactions or open EVM windows,
+and a cross-VM call cannot carry value into the EVM lane (section 2).
+
+**R2a Contract changes** (`TaskEscrow`; then redeploy `TaskFactory`, which embeds it):
+- `confirmFunding()` returns: callable by anyone while `Created` and not past the deadline; requires balance >= `price`;
+  sets `Funded` and emits `Funded(agreementId, client, price)`. `fund()` stays (scripts and key-holding agents).
+- `release` pays the lead agent exactly `price` (today it pays the whole balance), so an overpayment never goes to the agent.
+- `refundAfterDeadline` also works while `Created`: a part-paid job returns its whole balance to the client.
+- New `sweepExcess()`: callable by anyone once `Released` or `Refunded`; sends any remaining balance to the client. It is
+  separate from `release` so that a client address that rejects value can never block the agent's payment.
+- All other invariants unchanged. Tests cover exact, partial, over and late payment, double confirm and sweep.
+
+**R11 Sign in with QoreX (replaces wallet-nonce login with MetaMask).** The backend issues a nonce and a Sign In With
+QoreChain message (`createSiwqMessage`: domain, address, uri, chain id, nonce, issued-at, 5 minute expiry). The page signs it
+with `signArbitrary`. The backend verifies it with `verifySiwqWithChain`, `requirePq` on; the nonce is single use. The user
+record stays keyed by the lowercase `0x` form of the same 20 bytes. An account with no registered PQC key is told to make any
+first transaction in QoreX (which registers it). The optional password second factor is unchanged. Open: Q8.
+
+**R12 Funding by native transfer.** The job page asks QoreX to send `price` in uqor to the task contract's `qor1` form
+(`signAndBroadcast`, gas limit 300,000, about 0.045 QOR fee, shown to the user). The page reports the tx hash to
+`POST /agreements/:id/funding`. The backend verifies on chain: success, `MsgSend` from the **client's** address to this
+task, ML-DSA-87 extension; then the operator calls `confirmFunding()`. If the balance is short it answers with the missing
+amount. The indexer also confirms any `agreed` task whose balance already covers the price, so a closed browser cannot
+strand a paid job. Money states still change only from the indexed `Funded` event (rule 2). After `Released`/`Refunded` the
+backend calls `sweepExcess()` when a balance remains. Prices are limited to 6 decimals (whole uqor).
+
+**R6 (replaced) Frontend.** wagmi and the MetaMask connect flow are removed; a small QoreX connector uses
+`window.qorex.native` (detect, enable, `getKey`, `signArbitrary`, `signAndBroadcast`) with clear states for: not installed,
+too old, wrong network, rejected by the user, pending, success, error. Amounts show in QOR; "HBAR", Hedera, HashScan and x402
+copy is replaced; explorer links only after Q7 is answered. The faucet link is `https://dashboard.qorechain.io/faucet`.
+
+**Acceptance (adds to section 5; replaces "client `fund()` from QoreX" in item 1):** sign in with QoreX; fund by QoreX
+transfer; partial payment shows the shortfall and can be topped up; the full job completes and the lead agent receives exactly
+the price; an overpayment returns to the client.
+
+**Open questions**
+- **Q7** URL format of a transaction and an address on `explore.qore.network`.
+- **Q8** Whether `verifySiwqWithChain` accepts the signature `signArbitrary` returns over a `createSiwqMessage` text
+  (plain-message verification is proven; the SIWQ wrapper is not yet tried).
+
+**Plan** (today 25 Nov): contracts, tests and redeploy 26 Nov; backend sign-in and funding 26-27; frontend 27-29; full
+end-to-end 30; README and video 1 Dec; submit 2 Dec. The stretch goal R9 is dropped unless time remains.
+
