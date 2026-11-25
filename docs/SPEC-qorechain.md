@@ -41,6 +41,9 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | The hybrid signature extension of a native tx appears in `body.extension_options` (critical list) in the REST receipt | receipt of tx `29CE54CE…8B8C` |
 | Live agent payment (step 3.3), real backend + real Solidity Smith server on the testnet and the fresh database: a task was released with a 0.04 QOR sub-leg for Audit Hawk; the backend's `notifyPayoutsDue` reached the agent, which read what it owed from `GET /agreements/:id/payouts`, paid 0.04 QOR with a hybrid-signed native transfer and reported the tx; the backend verified it on chain and recorded it with `recordPayout`; the indexer set the leg `paid` with `payoutTx` equal to the agent's tx; sub-agent B received exactly 0.04 QOR; a repeated notice paid nothing more (ledger one entry) | task `0xE70653D486E9A34411DFBae9511b38E51c8d4aa9`, payment tx `46DBF17D…EEE0` |
 | A hybrid `MsgSend` uses about 187,362 gas but the fee is charged in full at the limit set (600,000 gas at 0.2 uqor = 120,000 uqor); the agents use 300,000 gas at 0.15 uqor = 45,000 uqor | receipt of tx `5E09B2DE…E585` |
+| A `MsgCrossVMCall` into the EVM lane cannot carry value: with a source VM equal to the target it is refused (`source and target VM must differ`); with another source value it is refused with `the evm lane cannot transfer funds; send them separately`. So `fund()` cannot be called with value from the native lane | txs `5BAE06E4…5C87`, `719D57DA…EABF`, 25 Nov |
+| A native hybrid-signed `MsgSend` to a task contract's `qor1…` form raises the contract's EVM balance (0 -> exactly 0.1 QOR) | tx `C9C2DAA1675150174C5467C5C913868AC348D6759B625E894DE16A0357BC87F2`, test task `0x9763d98057f4e1e10F4e46CCc64fb2ad1Ff9C78b` |
+| From the published package docs (not yet tried in a browser): QoreX's EVM provider only connects (no signing yet); its native provider `signAndBroadcast`s messages for a page, including `MsgSend`, and registers the PQC key itself, but refuses `MsgOpenEVMWindow`, key messages and `signArbitrary` | READMEs of `@qorechain/qorex-types` 0.1.0 and `@qorechain/wallet-adapter` 0.6.0 |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -146,8 +149,9 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 
 ## 6. Open questions (must be answered by testing, not assumed)
 
-- **Q1** How does a web-app user open an EVM window from the browser with QoreX? The docs say QoreX does it; the exact
-  dApp-side call (wallet-adapter `openEvmWindowMsg`) is untested.
+- **Q1** ANSWERED FROM DOCS 25 Nov: a page cannot open an EVM window (the user manages it inside QoreX) and cannot sign
+  an EVM transaction with QoreX. Funding design needs a decision (native transfer + on-chain confirmation, or MetaMask).
+  Still untested: QoreX `signAndBroadcast` in a real browser.
 - **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`).
 - **Q3** Finality and reorg behaviour of the EVM RPC.
 - **Q4** ANSWERED 18 Nov: the factory and a `TaskEscrow` created through it work, including fund, submit and release.
