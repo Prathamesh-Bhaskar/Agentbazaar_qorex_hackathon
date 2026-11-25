@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import Field, { PasswordInput } from './Field';
-import { FoxIcon, Icon } from './Icon';
+import { QOREX_ICON_DATA_URI } from '@qorechain/qorex-types/icon';
+import { Icon } from './Icon';
+import { QOREX_INSTALL_URL } from '@/lib/qorex';
 import { useSession, type AuthIntent, type StepKey } from '@/providers/Session';
 
 const LABELS: Record<StepKey, string> = {
-  connect: 'Connect your wallet account',
-  network: 'Switch to Hedera Testnet (chain 296)',
-  sign: 'Sign in with a one-time message',
+  connect: 'Connect QoreX (switched to testnet)',
+  sign: 'Sign the one-time sign-in message',
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,7 +59,7 @@ export default function ConnectModal() {
   return (
     <Modal onClose={s.closeConnect} label="Log in or sign up">
       <h2>{signup ? 'Create your account' : 'Log in'} <button onClick={s.closeConnect} aria-label="Close">&times;</button></h2>
-      <p className="sub">AgentBazaar runs on Hedera testnet. Your account is your <b>ECDSA</b> wallet{signup ? ', protected by an email and password' : ', plus your password if you set one'}.</p>
+      <p className="sub">AgentBazaar runs on QoreChain testnet. Your account is your <b>QoreX</b> wallet{signup ? ', protected by an email and password' : ', plus your password if you set one'}.</p>
 
       {!started ? (
         <>
@@ -101,13 +102,14 @@ export default function ConnectModal() {
             )}
           </div>
 
-          <button className="gvm-opt" onClick={go} disabled={s.busy || !s.hasWallet}>
-            <FoxIcon /><span>{signup ? 'Sign up with MetaMask' : 'Log in with MetaMask'}<small>Via the Hedera JSON-RPC relay</small></span><em>Recommended</em>
+          <button className="gvm-opt" onClick={go} disabled={s.busy}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={QOREX_ICON_DATA_URI} alt="" width={32} height={32} /><span>{signup ? 'Sign up with QoreX' : 'Log in with QoreX'}<small>Post-quantum signature · no transaction</small></span>
           </button>
           {!s.hasWallet && (
-            <div className="gvm-err" role="alert">No browser wallet detected. <a className="link" href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Install MetaMask</a>, then reload.</div>
+            <div className="gvm-err" role="alert">QoreX was not detected. <a className="link" href={QOREX_INSTALL_URL} target="_blank" rel="noopener noreferrer">Install QoreX</a>, then reload.</div>
           )}
-          <p className="gvm-note">{signup ? 'Your wallet signs one message. No transaction, no cost. Later logins need the wallet and this password.' : 'Signing in does not send a transaction and costs nothing. New here? Choose Sign up.'}</p>
+          <p className="gvm-note">{signup ? 'QoreX signs one message. No transaction, no cost. Later logins need the wallet and this password.' : 'Signing in does not send a transaction and costs nothing. New here? Choose Sign up.'} A brand-new QoreX account must send one transaction first, which registers its post-quantum key. Check that the sign-in message names this site.</p>
         </>
       ) : (
         <>
@@ -121,7 +123,7 @@ export default function ConnectModal() {
             ))}
           </div>
           {s.error && <div className="gvm-err" role="alert">{s.error}</div>}
-          {s.busy ? <p className="gvm-note">Approve each request in your wallet.</p> : (
+          {s.busy ? <p className="gvm-note">Approve each request in QoreX.</p> : (
             <div className="gvm-acts">
               <button className="gvm-btn" onClick={s.closeConnect}>Close</button>
               {s.error && <button className="gvm-btn" onClick={s.resetSteps}>Back</button>}

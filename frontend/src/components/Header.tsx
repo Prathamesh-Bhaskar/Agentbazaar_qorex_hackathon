@@ -2,9 +2,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useBalance } from 'wagmi';
+import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/providers/Session';
-import { fmtHbar, fromWeibar } from '@/lib/money';
+import { fmtQor } from '@/lib/money';
+import { api } from '@/lib/api';
+import { QORE_NETWORK_NAME } from '@/lib/qorex';
 import { shortAddr } from '@/lib/format';
 import { FAUCET_URL } from '@/lib/config';
 import Modal from './Modal';
@@ -18,37 +20,44 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard' },
 ];
 
+/** The balance is read by the backend (the chain's REST API does not allow every browser origin). */
+const useBalance = () => {
+  const { qorAddress } = useSession();
+  return useQuery({
+    queryKey: ['balance', qorAddress],
+    queryFn: () => api<{ balanceWei: string }>('/me/balance', { auth: true }),
+    enabled: !!qorAddress, refetchInterval: 20_000,
+  });
+};
+
 function WalletChip({ onOpen }: { onOpen: () => void }) {
-  const { address } = useSession();
-  const bal = useBalance({ address, query: { enabled: !!address, refetchInterval: 20_000 } });
+  const { qorAddress } = useSession();
+  const bal = useBalance();
   return (
     <button className="wallet-chip" onClick={onOpen} title="Wallet">
-      <span className="bal"><b>{bal.data ? fmtHbar(fromWeibar(bal.data.value)) : '…'}</b></span>
-      <span className="addr">{shortAddr(address)}</span>
+      <span className="bal"><b>{bal.data ? fmtQor(bal.data.balanceWei) : bal.isError ? '—' : '…'}</b></span>
+      <span className="addr">{shortAddr(qorAddress)}</span>
     </button>
   );
 }
 
 function WalletMenu({ onClose }: { onClose: () => void }) {
-  const { address, signOut, wrongNetwork, switchNetwork } = useSession();
-  const bal = useBalance({ address, query: { enabled: !!address } });
+  const { qorAddress, signOut } = useSession();
+  const bal = useBalance();
   return (
     <Modal onClose={onClose} label="Your wallet">
       <h2>Your wallet <button onClick={onClose} aria-label="Close">&times;</button></h2>
-      <p className="sub">MetaMask &middot; Hedera testnet (chain 296)</p>
+      <p className="sub">QoreX &middot; {QORE_NETWORK_NAME}</p>
       <dl className="gvm-rows">
-        <dt>Address</dt><dd className="mono" style={{ fontSize: 12.5 }}>{address}</dd>
-        <dt>Balance</dt><dd>{bal.data ? fmtHbar(fromWeibar(bal.data.value)) : '…'}</dd>
+        <dt>Address</dt><dd className="mono" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>{qorAddress}</dd>
+        <dt>Balance</dt><dd>{bal.data ? fmtQor(bal.data.balanceWei) : bal.isError ? 'Could not read it' : '…'}</dd>
       </dl>
-      {wrongNetwork && (
-        <div className="gvm-err">Your wallet is on another network. <button className="link" onClick={switchNetwork}>Switch to Hedera Testnet</button></div>
-      )}
       <div className="gvm-acts">
         <Link className="gvm-btn" href="/dashboard" onClick={onClose}>Dashboard</Link>
         <Link className="gvm-btn" href="/account" onClick={onClose}>Account</Link>
         <button className="gvm-btn" onClick={() => { onClose(); signOut(); }}>Log out</button>
       </div>
-      <a className="gvm-btn" style={{ width: '100%', marginTop: 10 }} href={FAUCET_URL} target="_blank" rel="noopener noreferrer">Get test HBAR (Hedera faucet)</a>
+      <a className="gvm-btn" style={{ width: '100%', marginTop: 10 }} href={FAUCET_URL} target="_blank" rel="noopener noreferrer">Get test QOR (faucet)</a>
     </Modal>
   );
 }
@@ -86,7 +95,7 @@ export default function Header() {
           {NAV.map((n) => <Link key={n.href} href={n.href} className={active(n.href) ? 'active' : ''} aria-current={active(n.href) ? 'page' : undefined}>{n.label}</Link>)}
         </nav>
         <div className="gv-right">
-          <span className="net-pill"><i />Hedera testnet</span>
+          <span className="net-pill"><i />{QORE_NETWORK_NAME}</span>
           <ThemeToggle />
           {s.ready && s.signedIn
             ? <WalletChip onOpen={() => setMenu(true)} />
@@ -97,11 +106,6 @@ export default function Header() {
       <nav id="mobile-nav" className={`mnav ${mobile ? 'open' : ''}`} aria-label="Mobile">
         {[...NAV, ...(s.signedIn ? [{ href: '/account', label: 'Account' }] : [])].map((n) => <Link key={n.href} href={n.href} className={active(n.href) ? 'active' : ''} aria-current={active(n.href) ? 'page' : undefined} onClick={() => setMobile(false)}>{n.label}</Link>)}
       </nav>
-      {s.signedIn && s.wrongNetwork && (
-        <div className="container" style={{ paddingTop: 10, paddingBottom: 10 }}>
-          <div className="notice n-warn"><Icon name="warn" /><span><b>Wrong network.</b> Your wallet is not on Hedera Testnet. <button className="link" onClick={s.switchNetwork}>Switch network</button></span></div>
-        </div>
-      )}
       {menu && <WalletMenu onClose={() => setMenu(false)} />}
     </header>
   );

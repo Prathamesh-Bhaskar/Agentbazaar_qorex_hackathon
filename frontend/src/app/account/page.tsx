@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSignMessage } from 'wagmi';
 import { api, apiErrorText } from '@/lib/api';
 import { errMessage, shortAddr } from '@/lib/format';
+import { connectQorex, requireAccount, signText } from '@/lib/qorex';
 import { useGithubStatus, useMe } from '@/lib/queries';
 import type { Me } from '@/lib/types';
 import { useSession } from '@/providers/Session';
@@ -39,7 +39,7 @@ export default function AccountPage() {
   return (
     <div className="page">
       <div className="container" style={{ maxWidth: 820 }}>
-        <div className="page-head"><div><p className="eyebrow-p">Account</p><h1>{u?.displayName ?? 'Your account'}</h1><p>{u?.email ?? 'No email yet'} · {shortAddr(session.address)}</p></div>
+        <div className="page-head"><div><p className="eyebrow-p">Account</p><h1>{u?.displayName ?? 'Your account'}</h1><p>{u?.email ?? 'No email yet'} · {shortAddr(session.qorAddress)}</p></div>
           <div className="row wrap" style={{ gap: 10 }}><Link className="btn btn-outline" href="/dashboard?tab=agents">My agents</Link><Link className="btn btn-outline" href="/dashboard?tab=agent-jobs">Jobs on my agents</Link></div></div>
         {me.error && <Notice kind="bad" style={{ marginBottom: 20 }}>Could not load your account. {(me.error as Error).message} <button className="link" onClick={() => me.refetch()}>Try again</button></Notice>}
         {me.isLoading || !u ? <div className="skel" style={{ height: 320 }} /> : (
@@ -50,7 +50,7 @@ export default function AccountPage() {
             <div className="card">
               <h3>Connections</h3>
               <dl className="kv">
-                <dt>Wallet</dt><dd className="mono" style={{ fontSize: 12.5 }}>{u.address}</dd>
+                <dt>Wallet</dt><dd className="mono" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>{u.qorAddress}</dd>
                 <dt>GitHub</dt><dd>{gh.isLoading ? '…' : gh.data?.connected ? `Connected as @${gh.data.login}` : 'Not connected. You can connect it when you list an agent.'}</dd>
                 <dt>Member since</dt><dd>{new Date(u.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</dd>
               </dl>
@@ -91,7 +91,6 @@ function Profile({ u, onSaved }: { u: Me; onSaved: () => void }) {
 function AddPassword({ onDone }: { onDone: () => void }) {
   const session = useSession();
   const { toast } = useToast();
-  const { signMessageAsync } = useSignMessage();
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [pw2, setPw2] = useState('');
@@ -108,9 +107,11 @@ function AddPassword({ onDone }: { onDone: () => void }) {
     setBusy(true);
     try {
       // Proving the wallet again with a fresh signature is what authorises adding the password.
-      const { nonce, message } = await api<{ nonce: string; message: string }>('/auth/nonce', { body: { address: session.address } });
-      const signature = await signMessageAsync({ message });
-      await api('/auth/signup', { body: { address: session.address, nonce, signature, email: email.trim(), password: pw } });
+      const { provider, account } = await connectQorex();
+      requireAccount(account, session.qorAddress!);
+      const { nonce, message } = await api<{ nonce: string; message: string }>('/auth/nonce', { body: { address: account.qor } });
+      const signature = await signText(provider, account, message);
+      await api('/auth/signup', { body: { address: account.qor, nonce, signature, email: email.trim(), password: pw } });
       toast('Email and password added', 'Next logins need your wallet and this password.');
       setPw(''); setPw2(''); onDone();
     } catch (er) { setErrs({ form: apiErrorText(er) === 'Something went wrong.' ? errMessage(er) : apiErrorText(er) }); }
@@ -125,8 +126,7 @@ function AddPassword({ onDone }: { onDone: () => void }) {
       </div>
       {errs.form && <div className="form-summary" role="alert">{errs.form}</div>}
       <div className="row wrap" style={{ gap: 12 }}>
-        <button className="btn btn-primary btn-sm" onClick={submit} disabled={busy || !session.walletReady}>{busy ? 'Confirm in your wallet…' : 'Add email and password'}</button>
-        {!session.walletReady && <span className="hint">Connect the wallet you signed in with first.</span>}
+        <button className="btn btn-primary btn-sm" onClick={submit} disabled={busy}>{busy ? 'Confirm in QoreX…' : 'Add email and password'}</button>
       </div>
     </div></div>
   );

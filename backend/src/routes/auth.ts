@@ -3,6 +3,7 @@ import { and, eq, gt, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { createSession, newToken, requireUser } from '../lib/auth.js';
+import { publicClient } from '../chain/client.js';
 import { checkSignature, SIGN_IN_TTL_MS, signInMessage, walletAddress, walletSignature } from '../lib/signIn.js';
 import { evmToQor } from '@qorechain/sdk';
 import { hashPassword, loginThrottle, passwordProblem, verifyPassword } from '../lib/password.js';
@@ -100,6 +101,12 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/me', { preHandler: requireUser }, async (req) => {
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, req.user!.id)).limit(1);
     return publicUser(user);
+  });
+
+  // The signed-in account's balance (wei; the 0x and qor1 forms share it). The web page asks here instead of the chain directly.
+  app.get('/me/balance', { preHandler: requireUser }, async (req, reply) => {
+    try { return { balanceWei: String(await publicClient.getBalance({ address: req.user!.address as `0x${string}` })) }; }
+    catch { return reply.code(503).send({ error: 'Could not read the balance from QoreChain' }); }
   });
 
   app.patch('/me', { preHandler: requireUser }, async (req, reply) => {

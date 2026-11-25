@@ -6,13 +6,14 @@ export class ApiError extends Error {
 
 // The session token lives in localStorage (see providers/Session.tsx). Read it lazily so this file works on the server too.
 const KEY = 'gv.session';
-export type StoredSession = { token: string; address: string; expiresAt: string };
+/** `address` is the 0x form (how the API identifies the user); `qor` is the same account as QoreX shows it. */
+export type StoredSession = { token: string; address: string; qor: string; expiresAt: string };
 
 export function readSession(): StoredSession | null {
   if (typeof window === 'undefined') return null;
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? 'null') as StoredSession | null;
-    if (s && new Date(s.expiresAt).getTime() > Date.now()) return s;
+    if (s?.qor && new Date(s.expiresAt).getTime() > Date.now()) return s; // a session from the old wallet login has no `qor`
   } catch { /* ignore */ }
   return null;
 }

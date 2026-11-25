@@ -3,13 +3,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 import { api, apiErrorText } from '@/lib/api';
-import { CHAIN_ID, FAUCET_URL } from '@/lib/config';
-import { taskEscrowAbi, FUND_GAS } from '@/lib/escrow';
 import { ago, errMessage, shortAddr } from '@/lib/format';
 import { contractUrl, shortTx, txUrl } from '@/lib/hashscan';
-import { fmtHbar, fromWeibar, toWeibar } from '@/lib/money';
+import { fmtHbar, fmtQor } from '@/lib/money';
 import { useDesign, useMe } from '@/lib/queries';
 import { CHECKS, type AgreementDetail, type AgreementStatus, type FundingInfo, type VerificationDetail } from '@/lib/types';
 import { useSession } from '@/providers/Session';
@@ -248,105 +245,18 @@ function Timeline({ status }: { status: AgreementStatus }) {
   );
 }
 
-const FUND_STEPS = ['Contract ready', 'Confirm in wallet', 'Network confirming', 'Funded'] as const;
-const FUND_AT = { idle: 0, wallet: 1, confirming: 2, indexing: 3 } as const;
-
-/** Four labelled steps so the wait after "Fund" never looks like a hang. Announced to screen readers as it advances. */
-function FundSteps({ stage }: { stage: keyof typeof FUND_AT }) {
-  const at = FUND_AT[stage];
-  return (
-    <>
-      <ol className="stepper" aria-label="Funding progress" style={{ marginBottom: 18, listStyle: 'none' }}>
-        {FUND_STEPS.map((label, i) => (
-          <li key={label} className={`step-pill ${i < at ? 'done' : i === at ? 'on' : ''}`} aria-current={i === at ? 'step' : undefined}>
-            <i>{i < at ? <Icon name="check" /> : i + 1}</i>{label}
-          </li>
-        ))}
-      </ol>
-      <span className="sr" role="status" aria-live="polite">Step {at + 1} of {FUND_STEPS.length}: {FUND_STEPS[at]}</span>
-    </>
-  );
-}
-
-function FundCard({ a, funding, isClient, signedIn, onFunded }: {
+function FundCard({ a, isClient, signedIn }: {
   a: AgreementDetail['agreement']; funding?: FundingInfo; isClient: boolean; signedIn: boolean; onFunded: () => void;
 }) {
-  const { toast } = useToast();
   const session = useSession();
-  const { address } = useAccount();
-  const publicClient = usePublicClient({ chainId: CHAIN_ID });
-  const { writeContractAsync } = useWriteContract();
-  const [stage, setStage] = useState<'idle' | 'wallet' | 'confirming' | 'indexing'>('idle');
-  const [hash, setHash] = useState<string>();
-
   const price = BigInt(a.priceTinybar);
-  const balance = useQuery({
-    queryKey: ['balance', address],
-    queryFn: async () => fromWeibar(await publicClient!.getBalance({ address: address! })),
-    enabled: !!address && !!publicClient,
-    staleTime: 10_000,
-  });
-  const short = balance.data !== undefined && balance.data < price;
-
-  async function fund() {
-    if (!a.escrowAddress || !publicClient) return;
-    setStage('wallet');
-    try {
-      // A slow RPC must not keep MetaMask from being asked: give up after 4s and let the wallet price the transaction.
-      const gasPrice = await Promise.race([
-        publicClient.getGasPrice().catch(() => undefined),
-        new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000)),
-      ]);
-      const tx = await writeContractAsync({
-        address: a.escrowAddress as `0x${string}`, abi: taskEscrowAbi, functionName: 'fund',
-        value: toWeibar(price), gas: FUND_GAS, chainId: CHAIN_ID,
-        ...(gasPrice ? { type: 'legacy' as const, gasPrice } : {}),
-      } as never);
-      setHash(tx);
-      setStage('confirming');
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: tx, timeout: 120_000 });
-      if (receipt.status !== 'success') throw new Error('The transaction reverted. Make sure you are using the account that posted this job.');
-      setStage('indexing'); // the backend flips the job to "funded" once it reads the on-chain event
-      toast('Funded', 'Waiting for the network to confirm…');
-      onFunded();
-    } catch (e) {
-      toast('Funding did not go through', errMessage(e), 'bad');
-      setStage('idle');
-    }
-  }
-
   if (!signedIn) return <div className="card"><h3>Fund this job</h3><p className="muted" style={{ marginBottom: 14 }}>Log in with the account that posted the job.</p><button className="btn btn-primary" onClick={session.openConnect}><Icon name="lock" />Log in</button></div>;
-  if (!isClient) return <div className="card"><h3>Waiting for funding</h3><p className="muted">The client has to lock {fmtHbar(price)} in the contract before the agent starts.</p></div>;
-
+  if (!isClient) return <div className="card"><h3>Waiting for funding</h3><p className="muted">The client has to lock {fmtQor(price)} in the contract before the agent starts.</p></div>;
   return (
-    <div className="stack">
-      <div className="escrow">
-        <div className="k">Lock in escrow</div>
-        <div className="amt">{fmtHbar(price)}</div>
-        <div className="k">Contract made for this job</div>
-        <div className="addr">{a.escrowAddress}</div>
-        <div className="meta"><span>Released to the agent only on PASS</span><span>Returned to you on FAIL or if the deadline passes</span></div>
-      </div>
-      <div className="card">
-        <FundSteps stage={stage} />
-        {stage === 'confirming' || stage === 'indexing' ? (
-          <div className="stack" style={{ gap: 10 }}>
-            <div className="row" style={{ gap: 12 }}><span className="ico-run" style={{ width: 24, height: 24 }} /><b>{stage === 'confirming' ? 'Waiting for Hedera to confirm…' : 'Confirmed. Updating the job…'}</b></div>
-            {hash && <a className="link mono" style={{ fontSize: 13 }} href={txUrl(hash)} target="_blank" rel="noopener noreferrer">{shortTx(hash)}<Icon name="ext" size={13} /></a>}
-            <span className="muted" style={{ fontSize: 13 }}>This page updates by itself, usually within a few seconds.</span>
-          </div>
-        ) : (
-          <div className="stack" style={{ gap: 12 }}>
-            {session.wrongNetwork && <Notice kind="warn">Your wallet is on another network. <button className="link" onClick={session.switchNetwork}>Switch to Hedera testnet</button></Notice>}
-            {session.signedIn && !session.walletReady && <Notice kind="warn">Your wallet account does not match the one you signed in with. Switch accounts in MetaMask, or connect again.</Notice>}
-            {short && <Notice kind="warn">Your wallet holds {fmtHbar(balance.data!)} on testnet, less than {fmtHbar(price)} plus fees. <a className="link" href={FAUCET_URL} target="_blank" rel="noopener noreferrer">Get testnet HBAR</a></Notice>}
-            <button className="btn btn-primary btn-lg" onClick={fund} disabled={stage === 'wallet' || !session.walletReady || session.wrongNetwork || !funding}>
-              {stage === 'wallet' ? 'Confirm in your wallet…' : `Fund ${fmtHbar(price)}`}
-            </button>
-            <span className="muted" style={{ fontSize: 13 }}>Your wallet will ask you to confirm a transaction of {fmtHbar(price)} plus a small network fee.</span>
-          </div>
-        )}
-      </div>
+    <div className="card">
+      <h3>Fund this job</h3>
+      <Notice kind="warn">Paying with QoreX from this page is not built yet. It arrives in the next update. Nothing can be sent from here for now.</Notice>
+      <dl className="kv" style={{ marginTop: 14 }}><dt>Price</dt><dd>{fmtQor(price)}</dd><dt>Job contract</dt><dd className="mono" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>{a.escrowAddress}</dd></dl>
     </div>
   );
 }

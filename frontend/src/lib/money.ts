@@ -40,3 +40,16 @@ export const toWeibar = (tinybar: string | bigint): bigint => BigInt(tinybar) * 
 export const fromWeibar = (wei: bigint): bigint => wei / WEI_PER_TINYBAR;
 
 export const sumTinybar = (xs: (string | bigint)[]): bigint => xs.reduce<bigint>((t, x) => t + BigInt(x), 0n);
+
+/** Wei -> "1,234.5 QOR" (QOR has 18 decimals on chain and 6 on the native lane). Display only. */
+export function fmtQor(wei: string | bigint | number | null | undefined, unit = true): string {
+  const v = BigInt(wei ?? 0);
+  const neg = v < 0n;
+  const a = neg ? -v : v;
+  const one = 10n ** 18n;
+  const frac = (a % one).toString().padStart(18, '0');
+  let decimals = frac.slice(0, 4).replace(/0+$/, '');
+  if (!decimals && a > 0n && a < one) decimals = frac.slice(0, 6).replace(/0+$/, '') || '000000';
+  const s = (a / one).toLocaleString('en-US') + (decimals ? `.${decimals}` : '');
+  return (neg ? '−' : '') + s + (unit ? ' QOR' : '');
+}
