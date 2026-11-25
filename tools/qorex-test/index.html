@@ -30,6 +30,11 @@
   <p><button id="fund" disabled>Send 0.01 QOR</button></p>
 </section>
 
+<section>
+  <b>4. Free signature test</b> — signs a text message only. No transaction, no fee.
+  <p><button id="sign" disabled>Sign a login message</button></p>
+</section>
+
 <h3>Result log</h3>
 <pre id="log"></pre>
 <p><button id="copy">Copy log</button> <span class="muted">Paste it back in the chat. It holds only addresses and transaction hashes.</span></p>
@@ -61,7 +66,7 @@ $('connect').onclick = async () => {
     const hex = '0x' + Array.from(key.address, (b) => b.toString(16).padStart(2, '0')).join('');
     log('connected:', me);
     log('20-byte address (EVM form):', hex, '| algo:', key.algo);
-    $('login').disabled = false; $('fund').disabled = false;
+    $('login').disabled = false; $('fund').disabled = false; $('sign').disabled = false;
   } catch (e) { log('connect FAILED:', String((e && e.message) || e)); }
 };
 
@@ -84,6 +89,14 @@ async function send(label, to, uqor, memo) {
 const nonce = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
 $('login').onclick = () => send('login', me, '1', 'agentbazaar-login:' + nonce());
 $('fund').onclick = () => send('fund', OPERATOR, '10000', 'agentbazaar-test:fund');
+$('sign').onclick = async () => {
+  const message = 'agentbazaar-login:' + nonce();
+  try {
+    log('sign: asking QoreX to sign the text ' + message);
+    const r = await provider().signArbitrary(CHAIN, me, message);
+    log('sign result:', r); // a signature and a public key: neither is secret
+  } catch (e) { log('sign FAILED:', String((e && e.message) || e)); }
+};
 $('copy').onclick = () => navigator.clipboard.writeText($('log').textContent);
 window.addEventListener('load', () => setTimeout(() => log(provider() ? 'page ready: QoreX detected' : 'page ready: QoreX not detected yet'), 600));
 </script>

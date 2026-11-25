@@ -44,6 +44,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | A `MsgCrossVMCall` into the EVM lane cannot carry value: with a source VM equal to the target it is refused (`source and target VM must differ`); with another source value it is refused with `the evm lane cannot transfer funds; send them separately`. So `fund()` cannot be called with value from the native lane | txs `5BAE06E4…5C87`, `719D57DA…EABF`, 25 Nov |
 | A native hybrid-signed `MsgSend` to a task contract's `qor1…` form raises the contract's EVM balance (0 -> exactly 0.1 QOR) | tx `C9C2DAA1675150174C5467C5C913868AC348D6759B625E894DE16A0357BC87F2`, test task `0x9763d98057f4e1e10F4e46CCc64fb2ad1Ff9C78b` |
 | From the published package docs (not yet tried in a browser): QoreX's EVM provider only connects (no signing yet); its native provider `signAndBroadcast`s messages for a page, including `MsgSend`, and registers the PQC key itself, but refuses `MsgOpenEVMWindow`, key messages and `signArbitrary` | READMEs of `@qorechain/qorex-types` 0.1.0 and `@qorechain/wallet-adapter` 0.6.0 |
+| In a real browser, QoreX `signAndBroadcast` works for a page on `http://localhost`: a self-transfer of 1 uqor with a memo and a 10,000 uqor transfer both committed with code 0, `shield: shielded`, about 6 s each; receipts show one `MsgSend`, the memo kept exactly, one signer (`cosmos.crypto.secp256k1.PubKey`, so a coin-type-118 account) and the ML-DSA-87 extension; fee 45,000 uqor at a 300,000 gas limit (about 168k used) | txs `E6001C7A…D06E` (login), `F5A45865…3AE7` (funding), 25 Nov |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -151,7 +152,8 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
 
 - **Q1** ANSWERED FROM DOCS 25 Nov: a page cannot open an EVM window (the user manages it inside QoreX) and cannot sign
   an EVM transaction with QoreX. Funding design needs a decision (native transfer + on-chain confirmation, or MetaMask).
-  Still untested: QoreX `signAndBroadcast` in a real browser.
+  Browser test passed 25 Nov (see section 2). Decision: option 1, QoreX only (login by transaction or signature,
+  funding by native transfer).
 - **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`).
 - **Q3** Finality and reorg behaviour of the EVM RPC.
 - **Q4** ANSWERED 18 Nov: the factory and a `TaskEscrow` created through it work, including fund, submit and release.
