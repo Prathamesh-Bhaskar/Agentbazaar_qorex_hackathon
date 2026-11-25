@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '@/lib/api';
 import { ago, errMessage, shortAddr } from '@/lib/format';
-import { contractUrl, shortTx, txUrl } from '@/lib/hashscan';
-import { fmtHbar } from '@/lib/money';
+import { addressUrl, EXPLORER_HINT } from '@/lib/explorer';
+import TxLink from '@/components/TxLink';
+import { fmtQor } from '@/lib/money';
 import { useDesign, useMe } from '@/lib/queries';
 import { CHECKS, type AgreementDetail, type AgreementStatus, type VerificationDetail } from '@/lib/types';
 import { useSession } from '@/providers/Session';
@@ -69,7 +70,7 @@ export default function JobPage() {
         <div className="page-head"><div>
           <p className="eyebrow-p">Job · {a.id.slice(0, 8)}</p>
           <h1>{d.request.title}</h1>
-          <p>Agent <Link className="link" href={`/agents/${d.agent.id}`}>{d.agent.name}</Link> · {fmtHbar(a.priceTinybar)} · <StatusChip status={a.status} />{a.escrowAddress && <> · <a className="link" href="#design">How this contract was designed</a></>}</p>
+          <p>Agent <Link className="link" href={`/agents/${d.agent.id}`}>{d.agent.name}</Link> · {fmtQor(a.priceTinybar)} · <StatusChip status={a.status} />{a.escrowAddress && <> · <a className="link" href="#design">How this contract was designed</a></>}</p>
         </div></div>
         {/* Money states arrive from the chain after a delay, so say it aloud when the status changes. */}
         <span className="sr" role="status" aria-live="polite">Job status: {a.status}</span>
@@ -148,7 +149,7 @@ export default function JobPage() {
                     {isClient && <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => call('Settlement', `/agreements/${id}/settle`)}>Retry settlement</button>}
                   </div>
                 )}
-                {d.verdict.settleTxHash && <p style={{ marginTop: 10, fontSize: 14 }}>Settlement transaction: <a className="link mono" href={txUrl(d.verdict.settleTxHash)} target="_blank" rel="noopener noreferrer">{shortTx(d.verdict.settleTxHash)}<Icon name="ext" size={13} /></a></p>}
+                {d.verdict.settleTxHash && <p style={{ marginTop: 10, fontSize: 14 }}>Settlement transaction: <TxLink hash={d.verdict.settleTxHash} /></p>}
               </div>
             )}
 
@@ -158,7 +159,7 @@ export default function JobPage() {
                 <h3>Agents hired on this job <small>agent-to-agent</small></h3>
                 <div className="list">{d.subLegs.map((l) => (
                   <div key={l.id} className="li"><span className={l.status === 'paid' ? 'ico-ok' : 'ico-wait'}>{l.status === 'paid' ? <Icon name="check" /> : null}</span>
-                    <div><Link className="link" href={`/agents/${l.calleeAgentId}`}>{l.calleeName ?? 'Sub-agent'}</Link><span className="sub">{fmtHbar(l.priceTinybar)} · paid by the main agent after release</span></div>
+                    <div><Link className="link" href={`/agents/${l.calleeAgentId}`}>{l.calleeName ?? 'Sub-agent'}</Link><span className="sub">{fmtQor(l.priceTinybar)} · paid by the main agent after release</span></div>
                     <span className={`status ${l.status === 'paid' ? 's-ok' : l.status === 'defaulted' ? 's-bad' : 's-warn'}`}>{l.status}</span></div>))}</div>
               </div>
             )}
@@ -168,11 +169,11 @@ export default function JobPage() {
               <div className="card">
                 <h3>Payments</h3>
                 <div className="list">{d.payments.map((p) => {
-                  const tx = p.hederaTxId ?? p.txHash;
+                  const tx = p.nativeTx ?? p.txHash; // the user's own transfer when there is one
                   return (
                     <div key={p.id} className="li"><span className={p.status === 'confirmed' ? 'ico-ok' : 'ico-wait'}>{p.status === 'confirmed' ? <Icon name="check" /> : null}</span>
-                      <div style={{ textTransform: 'capitalize' }}>{p.kind === 'a2a' ? 'Sub-agent payment' : p.kind}<span className="sub">{fmtHbar(p.amountTinybar)} · {ago(p.createdAt)}</span></div>
-                      {tx ? <a className="link mono" style={{ fontSize: 13 }} href={txUrl(tx)} target="_blank" rel="noopener noreferrer">{shortTx(tx)}<Icon name="ext" size={13} /></a> : <span className="muted">{p.status}</span>}</div>);
+                      <div style={{ textTransform: 'capitalize' }}>{{ fund: 'Funding', release: 'Paid to the agent', refund: 'Refund', a2a: 'Sub-agent payment', excess: 'Overpayment returned' }[p.kind]}<span className="sub">{fmtQor(p.amountTinybar)} · {ago(p.createdAt)}</span></div>
+                      {tx ? <TxLink hash={tx} /> : <span className="muted">{p.status}</span>}</div>);
                 })}</div>
               </div>
             )}
@@ -185,10 +186,10 @@ export default function JobPage() {
             </div>
             <div className="card">
               <dl className="kv">
-                <dt>Price</dt><dd>{fmtHbar(a.priceTinybar)}</dd>
+                <dt>Price</dt><dd>{fmtQor(a.priceTinybar)}</dd>
                 <dt>Deadline</dt><dd>{a.deadlineAt ? new Date(a.deadlineAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'None'}</dd>
                 <dt>Agent payout</dt><dd className="mono" style={{ fontSize: 12.5 }}>{shortAddr(d.agent.payoutAddress)}</dd>
-                {a.escrowAddress && <><dt>Contract</dt><dd><a className="link mono" style={{ fontSize: 12.5 }} href={contractUrl(a.escrowAddress)} target="_blank" rel="noopener noreferrer">{shortAddr(a.escrowAddress)}<Icon name="ext" size={13} /></a></dd></>}
+                {a.escrowAddress && <><dt>Contract</dt><dd><a className="link mono" style={{ fontSize: 12.5 }} href={addressUrl(a.escrowAddress)} title={EXPLORER_HINT} target="_blank" rel="noopener noreferrer">{shortAddr(a.escrowAddress)}<Icon name="ext" size={13} /></a></dd></>}
                 {d.terms && <><dt>Pass mark</dt><dd>{d.terms.spec.passThresholdPct}%</dd><dt>Sub-agent cap</dt><dd>{(d.terms.spec.maxSubBps / 100).toFixed(0)}%</dd></>}
               </dl>
             </div>
@@ -227,10 +228,10 @@ function Timeline({ status }: { status: AgreementStatus }) {
   const at = ORDER.indexOf(refunded ? 'released' : status);
   const steps: [string, string][] = [
     ['Agreed', 'Quote accepted, contract deployed'],
-    ['Funded', 'HBAR locked in the contract'],
+    ['Funded', 'QOR locked in the contract'],
     ['Work delivered', 'Agent submitted the result'],
     ['Verifying', 'Checks run on the work'],
-    [refunded ? 'Refunded' : 'Paid', refunded ? 'Check failed; HBAR returned to you' : 'Check passed; HBAR sent to the agent'],
+    [refunded ? 'Refunded' : 'Paid', refunded ? 'Check failed; QOR returned to you' : 'Check passed; QOR sent to the agent'],
   ];
   return (
     <div className="tl">{steps.map(([t, s], i) => {

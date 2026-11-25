@@ -1,4 +1,6 @@
 // Compares the terms the designer decided with what the deployed contract actually holds. Pure: no network, easy to test.
+import { formatEther } from 'viem';
+
 export type DesignedTerms = { priceTinybar: string; deadlineHours: number; maxSubBps: number; maxSubLegs: number; payoutGraceSecs: number };
 export type ChainTerms = { price: bigint; deadlineUnix: number; maxSubBps: number; maxSubLegs: number; payoutGrace: number };
 export type ProofRow = { key: string; label: string; designed: string; onchain: string; match: boolean };
@@ -9,7 +11,7 @@ const HOUR = 3600;
 export function compareTerms(spec: DesignedTerms, chain: ChainTerms, createdAtMs: number): ProofRow[] {
   const hoursOnChain = (chain.deadlineUnix * 1000 - createdAtMs) / (HOUR * 1000);
   return [
-    { key: 'price', label: 'Price', designed: `${spec.priceTinybar} tinybar`, onchain: `${chain.price} tinybar`, match: String(chain.price) === spec.priceTinybar },
+    { key: 'price', label: 'Price', designed: `${formatEther(BigInt(spec.priceTinybar))} QOR`, onchain: `${formatEther(chain.price)} QOR`, match: String(chain.price) === spec.priceTinybar },
     { key: 'deadline', label: 'Deadline', designed: `${spec.deadlineHours}h after creation`, onchain: `${hoursOnChain.toFixed(1)}h after creation (${new Date(chain.deadlineUnix * 1000).toISOString().slice(0, 16).replace('T', ' ')} UTC)`, match: Math.abs(hoursOnChain - spec.deadlineHours) <= 1 },
     { key: 'maxSubBps', label: 'Sub-agent spending cap', designed: `${(spec.maxSubBps / 100).toFixed(2)}%`, onchain: `${(chain.maxSubBps / 100).toFixed(2)}%`, match: chain.maxSubBps === spec.maxSubBps },
     { key: 'maxSubLegs', label: 'Max sub-agents', designed: String(spec.maxSubLegs), onchain: String(chain.maxSubLegs), match: chain.maxSubLegs === spec.maxSubLegs },

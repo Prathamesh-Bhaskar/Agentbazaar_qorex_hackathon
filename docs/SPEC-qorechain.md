@@ -52,6 +52,8 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | Sign-in backend (R11) with the real server: sign-in 200 with a session, replay refused (`bad_nonce`), another account's signature refused (401), classical-only refused (400), an account without a registered key told how to register (403 `no_pqc_key`) | live run 25 Nov, test accounts signing as QoreX does |
 | Web app sign-in (frontend step 1) in a headless browser against the real backend, with a stand-in `window.qorex.native` signing with a project test account in QoreX's format: missing, outdated and rejecting wallets give clear messages; login needs one signature and shows the balance and qor1 address; a wallet switched to another account is refused before signing; password accounts need both; 13 checks, no page errors. `getQorexNative()` detects a provider only if it has `getKey` and `signDirect`. Still to confirm with the real extension | run 25 Nov |
 | Web funding screen (frontend step 2) in a headless browser against the real backend, designer and testnet, with a stand-in wallet that signs and broadcasts with a project test account: a rejection sends and stores nothing; paying 15,000 of 40,000 uqor shows the 0.025 QOR shortfall and offers only the remainder; a sent payment whose report is blocked is remembered across a reload with no pay button (two transfers sent in total); the job became funded with one confirmed payment row and 0.04 QOR in the contract; 11 checks, no page errors; the test job was refunded afterwards | contract `0x257ce9a90d7399b0dcabff12de55664987f2b2e1`, 25 Nov. Real-extension funding still to be tried |
+| `explore.qore.network`: `/address/{qor1 or 0x}` and `/tx/{native hash}` display (a hybrid transfer shows status, block, fee, memo); EVM `0x` transaction hashes are not found; the network is a cookie (`qore-network`, default mainnet) with no URL parameter, so the reader selects Testnet | headless browser, 26 Nov (Q7) |
+| Web app (frontend step 3): all pages show QOR and QoreChain text; typed amounts are limited to 6 decimals and 0.05 QOR is stored as 50,000,000,000,000,000 wei; a job posted through the form, quoted and accepted in the UI got a contract whose terms match the design; 19 headless-browser checks, no page errors | 26 Nov |
 | Gas price about 112 gwei; testnet EVM tx gas cap 30,000,000 | `eth_gasPrice`; SDK `fetchEvmLimits` |
 | Opening a window advances the account's EVM nonce | SDK docs; the Foundry deploy right after succeeded |
 | The PQC key needs a second secret (a `QRC1-…` recovery code) besides the classical key | SDK 0.13+ `unifiedAccountFromSeed(seed, { recoveryCode })` |
@@ -228,7 +230,7 @@ transfer; partial payment shows the shortfall and can be topped up; the full job
 the price; an overpayment returns to the client.
 
 **Open questions**
-- **Q7** URL format of a transaction and an address on `explore.qore.network`.
+- **Q7** ANSWERED 26 Nov: see section 2. The app links addresses and native transactions and shows EVM hashes as copyable text.
 - **Q8** ANSWERED 25 Nov: it does not; the plain-message verifier is used (R11).
 
 **Plan** (today 25 Nov): contracts, tests and redeploy 26 Nov; backend sign-in and funding 26-27; frontend 27-29; full

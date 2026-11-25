@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { fmtHbar } from '@/lib/money';
+import { fmtQor } from '@/lib/money';
 import { ago, shortAddr } from '@/lib/format';
-import { txUrl, shortTx } from '@/lib/hashscan';
+import TxLink from '@/components/TxLink';
 import { useMe } from '@/lib/queries';
 import { useSession } from '@/providers/Session';
 import type { Agent, JobRow, MySummary } from '@/lib/types';
@@ -39,7 +39,7 @@ export default function Dashboard() {
   if (!on) {
     return (
       <div className="page"><div className="container" style={{ maxWidth: 720 }}>
-        <Empty title="Log in to see your dashboard">Your jobs, your agents and your HBAR activity belong to your account.<br /><button className="btn btn-primary" onClick={session.openConnect}><Icon name="lock" />Log in or sign up</button></Empty>
+        <Empty title="Log in to see your dashboard">Your jobs, your agents and your QOR activity belong to your account.<br /><button className="btn btn-primary" onClick={session.openConnect}><Icon name="lock" />Log in or sign up</button></Empty>
       </div></div>
     );
   }
@@ -48,14 +48,14 @@ export default function Dashboard() {
   return (
     <div className="page">
       <div className="container">
-        <div className="page-head"><div><p className="eyebrow-p">Dashboard</p><h1>Your AgentBazaar</h1><p>{shortAddr(session.address)} · Hedera testnet</p></div>
+        <div className="page-head"><div><p className="eyebrow-p">Dashboard</p><h1>Your AgentBazaar</h1><p>{shortAddr(session.qorAddress)} · QoreChain testnet</p></div>
           <div className="row" style={{ gap: 10 }}><Link className="btn btn-outline" href="/post-job">Post a job</Link><Link className="btn btn-primary" href="/list-agent">List an agent</Link></div></div>
 
         <div className="tiles" style={{ marginBottom: 28 }}>
-          <div className="tile"><span>Locked in your jobs</span><b>{s ? fmtHbar(s.lockedTinybar) : '…'}</b></div>
-          <div className="tile"><span>Earned by your agents</span><b className="p">{s ? fmtHbar(s.earnedTinybar) : '…'}</b></div>
+          <div className="tile"><span>Locked in your jobs</span><b>{s ? fmtQor(s.lockedTinybar) : '…'}</b></div>
+          <div className="tile"><span>Earned by your agents</span><b className="p">{s ? fmtQor(s.earnedTinybar) : '…'}</b></div>
           <div className="tile"><span>Active jobs</span><b>{s ? s.activeJobs : '…'}</b></div>
-          <div className="tile"><span>Wallet</span><b style={{ fontSize: 18, paddingTop: 6 }} className="mono">{shortAddr(session.address)}</b></div>
+          <div className="tile"><span>Wallet</span><b style={{ fontSize: 18, paddingTop: 6 }} className="mono">{shortAddr(session.qorAddress)}</b></div>
         </div>
         {me.data && !me.data.hasPassword && <Notice kind="warn" style={{ marginBottom: 20 }}>Your account is protected by your wallet only. <Link className="link" href="/account">Add an email and password</Link> to require both at login.</Notice>}
         {summary.error && <Notice kind="warn" style={{ marginBottom: 20 }}>Could not load your totals. {(summary.error as Error).message}</Notice>}
@@ -84,10 +84,10 @@ export default function Dashboard() {
               const amt = BigInt(a.amountTinybar);
               return (
                 <div key={i} className="li"><span className={amt < 0n ? 'ico-wait' : 'ico-ok'}><Icon name={amt < 0n ? 'arrow' : 'check'} /></span>
-                  <div>{a.text}<span className="sub">{ago(a.at)}{a.txId ? <> · <a className="link mono" href={txUrl(a.txId)} target="_blank" rel="noopener noreferrer">{shortTx(a.txId)}</a></> : null}</span></div>
-                  <b className={amt > 0n ? 'text-primary' : undefined}>{amt === 0n ? '' : `${amt > 0n ? '+' : ''}${fmtHbar(amt)}`}</b></div>);
+                  <div>{a.text}<span className="sub">{ago(a.at)}{a.txId ? <> · <TxLink hash={a.txId} small /></> : null}</span></div>
+                  <b className={amt > 0n ? 'text-primary' : undefined}>{amt === 0n ? '' : `${amt > 0n ? '+' : ''}${fmtQor(amt)}`}</b></div>);
             })}</div></div>
-          ) : <Empty title="No HBAR movements yet">Funding, payouts and refunds will show up here.</Empty>
+          ) : <Empty title="No QOR movements yet">Funding, payouts and refunds will show up here.</Empty>
         )}
       </div>
     </div>
@@ -107,7 +107,7 @@ function JobList({ q, empty, cta, showClient }: { q: { isLoading: boolean; error
     <div className="card"><div className="list">{rows.map((j) => (
       <Link key={j.id} className="li" href={`/jobs/${j.id}`}>
         <span className="mono muted">{j.id.slice(0, 6)}</span>
-        <div>{j.title}<span className="sub">{j.agentName}{showClient && j.clientAddress ? ` · client ${shortAddr(j.clientAddress)}` : ''} · {fmtHbar(j.priceTinybar)} · {ago(j.createdAt)}</span></div>
+        <div>{j.title}<span className="sub">{j.agentName}{showClient && j.clientAddress ? ` · client ${shortAddr(j.clientAddress)}` : ''} · {fmtQor(j.priceTinybar)} · {ago(j.createdAt)}</span></div>
         <span className="row" style={{ gap: 8 }}>
           {needsAction(j, showClient) && <span className="status s-warn">Needs funding</span>}
           <StatusChip status={j.status} />

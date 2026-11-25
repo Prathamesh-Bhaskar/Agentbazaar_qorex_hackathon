@@ -16,7 +16,7 @@ type User = typeof schema.users.$inferSelect;
 /** What the API may show about a user. Never the password hash. */
 const publicUser = (u: User) => ({
   id: u.id, address: u.address, qorAddress: evmToQor(u.address), displayName: u.displayName, email: u.email, role: u.role,
-  hederaAccountId: u.hederaAccountId, createdAt: u.createdAt, hasPassword: !!u.passwordHash,
+  createdAt: u.createdAt, hasPassword: !!u.passwordHash,
 });
 
 /** Check the one-time nonce and the QoreX signature over our sign-in text. Burns the nonce. Returns the user key (0x form). */

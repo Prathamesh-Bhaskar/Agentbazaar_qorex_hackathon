@@ -1,5 +1,5 @@
 // Agent-to-agent hiring. Agent A hires sub-agent B inside the SAME task contract (max 2 hops: client -> A -> B).
-// B's price is added as a leg of the contract; after the whole task is released, A pays B over x402.
+// B's price is added as a leg of the contract; after the whole task is released, A pays B with a native QOR transfer.
 import type { FastifyInstance } from 'fastify';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -43,10 +43,10 @@ export async function a2aRoutes(app: FastifyInstance) {
 
     const [call] = await db.insert(schema.a2aCalls).values({
       agreementId: body.agreementId, callerAgentId: req.agent!.id, calleeAgentId: body.calleeAgentId,
-      priceTinybar: r.price.toString(), rail: 'x402', status: r.reason ? 'blocked' : 'quoted', blockedReason: r.reason, depth: 2,
+      priceTinybar: r.price.toString(), rail: 'native', status: r.reason ? 'blocked' : 'quoted', blockedReason: r.reason, depth: 2,
     }).returning();
     if (r.reason) return reply.code(403).send({ allowed: false, reason: r.reason, callId: call.id, remainingBudgetTinybar: r.remaining.toString() });
-    return { allowed: true, callId: call.id, priceTinybar: r.price.toString(), remainingBudgetTinybar: r.remaining.toString(), payment: 'x402, after the task is released' };
+    return { allowed: true, callId: call.id, priceTinybar: r.price.toString(), remainingBudgetTinybar: r.remaining.toString(), payment: 'a hybrid-signed QOR transfer, after the task is released' };
   });
 
   // Commit the hire: the leg is added to the contract on-chain, then the sub-task is sent to B and B's result is returned to A.

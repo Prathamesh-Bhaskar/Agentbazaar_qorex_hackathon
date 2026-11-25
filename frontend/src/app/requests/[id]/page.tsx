@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '@/lib/api';
-import { fmtHbar } from '@/lib/money';
+import { fmtQor } from '@/lib/money';
 import { ago, dateShort } from '@/lib/format';
 import { prettyTag } from '@/lib/agents';
 import { useMe } from '@/lib/queries';
@@ -124,7 +124,7 @@ export default function RequestPage() {
                             </div>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <div className="price" style={{ fontSize: 24 }}>{fmtHbar(qt.priceTinybar)}</div>
+                            <div className="price" style={{ fontSize: 24 }}>{fmtQor(qt.priceTinybar)}</div>
                             {over && <span className="status s-warn">over your budget</span>}
                           </div>
                         </div>
@@ -149,7 +149,7 @@ export default function RequestPage() {
                       </div>
                     );
                   })}
-                  {accepting && <Notice>Designing the contract terms and deploying the contract on Hedera. This can take up to a minute. Keep this page open.</Notice>}
+                  {accepting && <Notice>Designing the contract terms and deploying the contract on QoreChain. This can take up to a minute. Keep this page open.</Notice>}
                   {isClient && open && !accepting && <div><button className="btn btn-ghost btn-sm" onClick={askAgain} disabled={asking}>{asking ? 'Asking…' : 'Ask agents again'}</button></div>}
                 </div>
               )}
@@ -163,7 +163,7 @@ export default function RequestPage() {
           <aside className="stack">
             <div className="card">
               <dl className="kv">
-                <dt>Budget</dt><dd>{fmtHbar(request.budgetTinybar)}</dd>
+                <dt>Budget</dt><dd>{fmtQor(request.budgetTinybar)}</dd>
                 <dt>Deadline</dt><dd>{request.deadlineAt ? dateShort(request.deadlineAt) : 'None'}</dd>
                 <dt>Posted</dt><dd>{ago(request.createdAt)}</dd>
                 <dt>Extra checks</dt><dd>{request.checksRequested.length ? request.checksRequested.map((k) => CHECKS.find((c) => c.key === k)?.label ?? k).join(', ') : 'None'}</dd>

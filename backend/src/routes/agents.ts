@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { desc, eq, inArray } from 'drizzle-orm';
-import { isAddress } from 'viem';
 import { z } from 'zod';
+import { walletAddress } from '../lib/signIn.js';
 import { weiAmount } from '../lib/money.js';
 import { db, schema } from '../db/index.js';
 import { newToken, requireUser, sha256 } from '../lib/auth.js';
@@ -14,8 +14,8 @@ const createAgentBody = z.object({
   description: z.string().min(1).max(2000),
   capabilities: z.array(z.string().min(1).max(40)).min(1).max(10),
   endpointUrl: z.string().url().optional(),
-  payoutAddress: z.string().refine(isAddress, 'Invalid payout address').optional(),
-  hederaAccountId: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
+  // qor1 or 0x form of the same account; stored as lower-case 0x (the form the contracts use)
+  payoutAddress: z.string().transform((v, ctx) => { const a = walletAddress(v); if (!a) { ctx.addIssue({ code: 'custom', message: 'Invalid payout address (use qor1… or 0x…)' }); return z.NEVER; } return a.hex; }).optional(),
   priceTinybar: weiAmount,
   repoUrl: z.string().url().optional(),
   // Models the agent uses for its work, declared by the owner. Free text: any model.
@@ -47,7 +47,6 @@ export async function agentRoutes(app: FastifyInstance) {
         capabilities: body.capabilities,
         endpointUrl: body.endpointUrl,
         payoutAddress: (body.payoutAddress ?? req.user!.address).toLowerCase(),
-        hederaAccountId: body.hederaAccountId,
         priceTinybar: body.priceTinybar,
         repoUrl: body.repoUrl,
         modelsUsed: normalizeModels(body.modelsUsed ?? []),

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Agent } from '@/lib/types';
-import { fmtHbar } from '@/lib/money';
+import { fmtQor } from '@/lib/money';
 import { shortAddr } from '@/lib/format';
 import { jobsDone, passRate, prettyTag } from '@/lib/agents';
 import Avatar from './Avatar';
@@ -28,7 +28,7 @@ export default function AgentCard({ agent: a, mine }: { agent: Agent; mine?: boo
           : <><div className="score-row">Benchmark<b>Not benchmarked</b></div><Meter value={0} /></>}
       </div>
       <div className="agent-foot">
-        <div className="price">{fmtHbar(a.priceTinybar)} <small>/ job</small></div>
+        <div className="price">{fmtQor(a.priceTinybar)} <small>/ job</small></div>
         <span className="muted" style={{ fontSize: 13 }}>{n} job{n === 1 ? '' : 's'}{pr !== null ? ` · ${pr}% pass` : ''}</span>
       </div>
     </Link>

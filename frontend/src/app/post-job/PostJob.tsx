@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, apiErrorText } from '@/lib/api';
-import { hbarToTinybar, fmtHbar } from '@/lib/money';
+import { parseQor, fmtQor } from '@/lib/money';
 import { dateInputValue } from '@/lib/format';
 import { useAgent } from '@/lib/queries';
 import { CHECKS, type JobRequest } from '@/lib/types';
@@ -40,8 +40,8 @@ export default function PostJob() {
     const e: Errs = {};
     if (title.trim().length < 3) e.title = 'Give the job a short title (3+ characters).';
     if (requirements.trim().length < 10) e.requirements = 'Describe what you need in at least 10 characters.';
-    const b = hbarToTinybar(budget);
-    if (!b || b === 0n) e.budget = 'Enter a positive amount (up to 8 decimals).';
+    const b = parseQor(budget);
+    if (!b || b === 0n) e.budget = 'Enter a positive amount (up to 6 decimals).';
     // End of the chosen day, local time.
     const when = new Date(`${deadline}T23:59:00`);
     if (!deadline || Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) e.deadline = 'Pick a date in the future.';
@@ -82,11 +82,11 @@ export default function PostJob() {
         <div className="page-head"><div>
           <p className="eyebrow-p">Post a job</p>
           <h1>What do you need done?</h1>
-          <p>Agents send you quotes. You pick one, lock the HBAR in a contract made for this job, and it is paid out only if the work passes verification.</p>
+          <p>Agents send you quotes. You pick one, send the QOR to a contract made for this job, and it is paid out only if the work passes verification.</p>
         </div></div>
 
         <div className="stack">
-          {pa && <Notice>You are hiring <b>{pa.name}</b> (asks {fmtHbar(pa.priceTinybar)}). Every listed agent is asked for a quote; <b>{pa.name}</b> will be highlighted when it answers.</Notice>}
+          {pa && <Notice>You are hiring <b>{pa.name}</b> (asks {fmtQor(pa.priceTinybar)}). Every listed agent is asked for a quote; <b>{pa.name}</b> will be highlighted when it answers.</Notice>}
           {!session.signedIn && <Notice>Log in to post. Your wallet is the account that funds the job.</Notice>}
 
           <div className="card"><div className="form-grid">
@@ -99,10 +99,10 @@ export default function PostJob() {
                 value={requirements} onChange={(e) => setRequirements(e.target.value)} />
             </Field>
             <div className="form-grid two">
-              <Field label="Budget (HBAR)" hint="The most you will pay. Quotes above it are not accepted." error={errs.budget}>
+              <Field label="Budget (QOR)" hint="The most you will pay. Quotes above it are not accepted." error={errs.budget}>
                 <input id="budget" className="input" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
               </Field>
-              <Field label="Deadline" hint="End of that day in your local time. If the work is not delivered by then, you can take your HBAR back." error={errs.deadline}>
+              <Field label="Deadline" hint="End of that day in your local time. If nothing is delivered by the job’s deadline, the contract returns your QOR." error={errs.deadline}>
                 <input id="deadline" type="date" className="input" min={inDays(1)} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
               </Field>
             </div>

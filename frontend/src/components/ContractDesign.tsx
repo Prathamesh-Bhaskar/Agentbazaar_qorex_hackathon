@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
 import { CHECKS, type ContractSpec, type DesignSub, type TermsProof } from '@/lib/types';
-import { fmtHbar } from '@/lib/money';
+import { fmtQor } from '@/lib/money';
 import { shortAddr } from '@/lib/format';
-import { contractUrl, shortTx, txUrl } from '@/lib/hashscan';
+import { addressUrl, EXPLORER_HINT, shortTx } from '@/lib/explorer';
+import TxLink from './TxLink';
 import { Icon } from './Icon';
 import Notice from './Notice';
 import Ring from './Ring';
@@ -153,11 +154,11 @@ export default function ContractDesign({ mode = 'full', requirements, agent, spe
           </Stage>
 
           {mode === 'full' && proof && (
-            <Stage n={requirements !== undefined ? 5 : 4} title="Proof on the contract" tag={contract ? <a className="link mono" style={{ fontSize: 12.5 }} href={contractUrl(contract)} target="_blank" rel="noopener noreferrer">{shortAddr(contract)}<Icon name="ext" size={13} /></a> : undefined}>
+            <Stage n={requirements !== undefined ? 5 : 4} title="Proof on the contract" tag={contract ? <a className="link mono" style={{ fontSize: 12.5 }} href={addressUrl(contract)} title={EXPLORER_HINT} target="_blank" rel="noopener noreferrer">{shortAddr(contract)}<Icon name="ext" size={13} /></a> : undefined}>
               <ProofTable proof={proof} />
               <dl className="kv" style={{ marginTop: 12 }}>
                 {specHash && <><dt>Design fingerprint</dt><dd className="mono" style={{ fontSize: 12 }}>{shortTx(specHash)}</dd></>}
-                {deployTx && <><dt>Deployed in</dt><dd><a className="link mono" style={{ fontSize: 12 }} href={txUrl(deployTx)} target="_blank" rel="noopener noreferrer">{shortTx(deployTx)}<Icon name="ext" size={13} /></a></dd></>}
+                {deployTx && <><dt>Deployed in</dt><dd><TxLink hash={deployTx} small /></dd></>}
               </dl>
             </Stage>
           )}
@@ -179,7 +180,7 @@ export function SubContracts({ subs }: { subs: DesignSub[] }) {
         return (
           <div key={s.legId} className="cd-sub">
             <div className="row between wrap" style={{ gap: 10 }}>
-              <div><span className="cd-k">Sub-contract #{s.legId} &middot; hired by the agent inside this job</span><b style={{ display: 'block', fontSize: 16 }}>{s.callee?.name ?? 'Sub-agent'} &middot; {fmtHbar(s.priceTinybar)}</b></div>
+              <div><span className="cd-k">Sub-contract #{s.legId} &middot; hired by the agent inside this job</span><b style={{ display: 'block', fontSize: 16 }}>{s.callee?.name ?? 'Sub-agent'} &middot; {fmtQor(s.priceTinybar)}</b></div>
               <span className={`status ${s.status === 'paid' ? 's-ok' : s.status === 'defaulted' ? 's-bad' : 's-idle'}`}>{s.status}</span>
             </div>
             {sp ? <ContractDesign mode="full" agent={{ name: s.callee?.name ?? 'Sub-agent', capabilities: s.callee?.capabilities ?? [] }} spec={sp} source={s.design.source} specHash={s.design.specHash} />
@@ -190,10 +191,10 @@ export function SubContracts({ subs }: { subs: DesignSub[] }) {
                   <div className="cd-row"><span className={p.match ? 'ico-ok' : 'ico-bad'}><Icon name={p.match ? 'check' : 'x'} /></span>
                     <div><b>Terms hash on the contract</b><span className="sub">{p.match ? 'Equals the hash of the terms above' : 'Does NOT equal the stored terms'} &middot; <span className="mono">{shortTx(p.onchainHash)}</span></span></div></div>
                   <div className="cd-row"><span className={p.priceMatch ? 'ico-ok' : 'ico-bad'}><Icon name={p.priceMatch ? 'check' : 'x'} /></span>
-                    <div><b>Price on the contract</b><span className="sub">{fmtHbar(p.onchainPrice)} on-chain &middot; {fmtHbar(s.priceTinybar)} recorded</span></div></div>
+                    <div><b>Price on the contract</b><span className="sub">{fmtQor(p.onchainPrice)} on-chain &middot; {fmtQor(s.priceTinybar)} recorded</span></div></div>
                 </>
               ) : <Notice kind="warn">{p.state === 'missing' ? 'This leg was not found on the contract.' : 'Could not read the contract just now. It retries by itself.'}</Notice>}
-              {s.addLegTx && <div className="muted" style={{ fontSize: 13 }}>Added in <a className="link mono" href={txUrl(s.addLegTx)} target="_blank" rel="noopener noreferrer">{shortTx(s.addLegTx)}<Icon name="ext" size={13} /></a></div>}
+              {s.addLegTx && <div className="muted" style={{ fontSize: 13 }}>Added in <TxLink hash={s.addLegTx} /></div>}
             </div>
           </div>
         );

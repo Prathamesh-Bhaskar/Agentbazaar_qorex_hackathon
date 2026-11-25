@@ -10,7 +10,6 @@ export type Agent = {
   capabilities: string[];
   endpointUrl: string | null;
   payoutAddress: string;
-  hederaAccountId: string | null;
   priceTinybar: string;
   repoUrl: string | null;
   repoCommit: string | null;
@@ -125,7 +124,7 @@ export type Payment = {
   kind: 'fund' | 'release' | 'refund' | 'a2a' | 'excess';
   amountTinybar: string;
   txHash: string | null;
-  hederaTxId: string | null;
+  nativeTx: string | null; // the user's own native funding transfer
   payerAccountId: string | null;
   status: 'pending' | 'confirmed' | 'failed';
   createdAt: string;
@@ -231,8 +230,7 @@ export const TAGS = ['Code review', 'Security', 'Backend', 'Frontend', 'Smart co
 export type RecentJob = { id: string; title: string; status: AgreementStatus; priceTinybar: string; createdAt: string };
 export type AgentDetail = { agent: Agent; benchmark: Benchmark | null; recentJobs: RecentJob[] };
 export type Me = {
-  id: string; address: string; qorAddress: string; displayName: string | null; email: string | null; role: 'client' | 'lister' | 'both' | null;
-  hederaAccountId: string | null; hasPassword: boolean; createdAt: string;
+  id: string; address: string; qorAddress: string; displayName: string | null; email: string | null; role: 'client' | 'lister' | 'both' | null; hasPassword: boolean; createdAt: string;
 };
 
 // ---- contract design (GET /agreements/:id/design) ----

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '@/lib/api';
 import { API_URL } from '@/lib/config';
-import { hbarToTinybar, tinybarToInput } from '@/lib/money';
+import { parseQor, weiToInput } from '@/lib/money';
 import { prettyTag, CODE_CHECKS } from '@/lib/agents';
 import { useAgent, useGithubRepos, useGithubStatus, useMe, useModels } from '@/lib/queries';
 import { TAGS, type Agent, type Benchmark } from '@/lib/types';
@@ -76,7 +76,7 @@ export default function ListAgentWizard() {
     if (!rerunId || !a || !restored) return;
     if (me.data && me.data.id !== a.ownerUserId) return;
     setAgentId(a.id);
-    setD((x) => ({ ...x, name: a.name, description: a.description, tags: a.capabilities, models: a.modelsUsed ?? [], price: tinybarToInput(a.priceTinybar), endpoint: a.endpointUrl ?? '', payout: a.payoutAddress, repo: a.repoUrl ?? x.repo }));
+    setD((x) => ({ ...x, name: a.name, description: a.description, tags: a.capabilities, models: a.modelsUsed ?? [], price: weiToInput(a.priceTinybar), endpoint: a.endpointUrl ?? '', payout: a.payoutAddress, repo: a.repoUrl ?? x.repo }));
     setStep((s) => (s === 0 ? 1 : s));
   }, [rerunId, existing.data, me.data, restored]);
 
@@ -123,10 +123,10 @@ export default function ListAgentWizard() {
     if (!/^[A-Za-z0-9][A-Za-z0-9 ._()-]{2,59}$/.test(d.name.trim())) e.name = 'Use 3–60 letters, numbers or spaces.';
     if (d.description.trim().length < 20) e.description = 'Describe it in at least 20 characters.';
     if (!d.tags.length) e.tags = 'Pick at least one capability.';
-    const p = hbarToTinybar(d.price);
-    if (!p || p === 0n) e.price = 'Enter a positive amount (up to 8 decimals).';
+    const p = parseQor(d.price);
+    if (!p || p === 0n) e.price = 'Enter a positive amount (up to 6 decimals).';
     if (d.endpoint.trim()) { try { const u = new URL(d.endpoint.trim()); if (!/^https?:$/.test(u.protocol)) throw 0; } catch { e.endpoint = 'Use a full http(s):// URL.'; } }
-    if (d.payout.trim() && !/^0x[0-9a-fA-F]{40}$/.test(d.payout.trim())) e.payout = 'Use a 0x address with 40 hex characters.';
+    if (d.payout.trim() && !/^(0x[0-9a-fA-F]{40}|qor1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})$/.test(d.payout.trim())) e.payout = 'Use a qor1 address (or its 0x form).';
     setErrs(e);
     if (Object.keys(e).length) toast('Check the highlighted fields', '', 'bad');
     return !Object.keys(e).length;
@@ -141,7 +141,7 @@ export default function ListAgentWizard() {
           auth: true,
           body: {
             name: d.name.trim(), description: d.description.trim(), capabilities: d.tags,
-            priceTinybar: hbarToTinybar(d.price)!.toString(), repoUrl: d.repo || undefined,
+            priceTinybar: parseQor(d.price)!.toString(), repoUrl: d.repo || undefined,
             endpointUrl: d.endpoint.trim() || undefined, payoutAddress: d.payout.trim() || undefined,
             modelsUsed: d.models,
           },
@@ -204,7 +204,7 @@ function Details({ d, errs, set, toggleTag, toggleModel, signedIn, onConnect, on
       <div className="card"><div className="form-grid">
         <div className="form-grid two">
           <div className="field"><label htmlFor="name">Agent name</label><input id="name" className={`input ${errs.name ? 'bad' : ''}`} maxLength={60} placeholder="e.g. SchemaBot" value={d.name} onChange={(e) => set('name', e.target.value)} /><E k="name" /></div>
-          <div className="field"><label htmlFor="price">Price per job</label><div className="input-group"><input id="price" className={`input ${errs.price ? 'bad' : ''}`} inputMode="decimal" value={d.price} onChange={(e) => set('price', e.target.value)} /><span className="addon">HBAR</span></div><E k="price" /></div>
+          <div className="field"><label htmlFor="price">Price per job</label><div className="input-group"><input id="price" className={`input ${errs.price ? 'bad' : ''}`} inputMode="decimal" value={d.price} onChange={(e) => set('price', e.target.value)} /><span className="addon">QOR</span></div><E k="price" /></div>
         </div>
         <div className="field"><label htmlFor="desc">What it does</label><textarea id="desc" className={`textarea ${errs.description ? 'bad' : ''}`} style={{ minHeight: 90 }} maxLength={2000} placeholder="One or two sentences a client will read on the listing." value={d.description} onChange={(e) => set('description', e.target.value)} /><E k="description" /></div>
         <div className="field"><label>Capabilities</label>
@@ -223,7 +223,7 @@ function Details({ d, errs, set, toggleTag, toggleModel, signedIn, onConnect, on
           <span className="hint">Shown to clients on your listing. You declare it; we do not verify it. Up to 6.</span></div>
         <div className="form-grid two">
           <div className="field"><label htmlFor="endpoint">Endpoint URL <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label><input id="endpoint" className={`input ${errs.endpoint ? 'bad' : ''}`} placeholder="https://your-agent.example" value={d.endpoint} onChange={(e) => set('endpoint', e.target.value)} /><span className="hint">Where we send quote requests and tasks. Without it your agent pulls them from the API.</span><E k="endpoint" /></div>
-          <div className="field"><label htmlFor="payout">Payout address</label><input id="payout" className={`input mono ${errs.payout ? 'bad' : ''}`} style={{ fontSize: 13.5 }} placeholder="0x… (defaults to your wallet)" value={d.payout} onChange={(e) => set('payout', e.target.value)} /><span className="hint">Must be an existing Hedera account (ECDSA).</span><E k="payout" /></div>
+          <div className="field"><label htmlFor="payout">Payout address</label><input id="payout" className={`input mono ${errs.payout ? 'bad' : ''}`} style={{ fontSize: 13.5 }} placeholder="qor1… (defaults to your wallet)" value={d.payout} onChange={(e) => set('payout', e.target.value)} /><span className="hint">Your QoreChain account; payments for this agent go here.</span><E k="payout" /></div>
         </div>
       </div></div>
       <div className="row between wrap"><span className="muted" style={{ fontSize: 13.5 }}>Listing is free. Clients pay per job through a contract.</span>

@@ -108,7 +108,7 @@ export async function settle(agreementId: string): Promise<{ txHash: string; res
 
 /**
  * Add an A -> B leg to the task: check the on-chain caps, design the sub-terms, get the verifier's approval and let the
- * operator add the leg. B is paid later, by A over x402, after the whole task is released.
+ * operator add the leg. B is paid later, by A with a native QOR transfer, after the whole task is released.
  */
 export async function createSubLeg(args: { agreementId: string; calleeAgentId: string; subtask: string }) {
   const [agreement] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, args.agreementId)).limit(1);

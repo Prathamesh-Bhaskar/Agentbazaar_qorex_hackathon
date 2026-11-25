@@ -20,7 +20,7 @@ const ICONS: Record<string, ReactElement> = {
   undo: <path {...P} strokeWidth="1.9" d="M9 6l-5 5 5 5M4.5 11H15a5 5 0 010 10h-4" />,
   file: <><path {...P} strokeWidth="1.8" d="M7 3h7l4 4v13H7z" /><path {...P} strokeWidth="1.8" d="M14 3v4h4M9.5 12h5M9.5 15.5h5" /></>,
   scale: <><path {...P} strokeWidth="1.8" d="M12 4v15M7 19.5h10M4.5 7.5h15" /><path {...P} strokeWidth="1.8" d="M4.5 7.5l-2.2 6a2.4 2.4 0 004.4 0zM19.5 7.5l-2.2 6a2.4 2.4 0 004.4 0z" /></>,
-  hbar: <><circle cx="12" cy="12" r="8.5" {...P} strokeWidth="1.8" /><path {...P} strokeWidth="1.8" d="M10 8v8M14 8v8M10 10.5h4M10 13.5h4" /></>,
+  coin: <><circle cx="12" cy="12" r="8.5" {...P} strokeWidth="1.8" /><circle cx="12" cy="11.5" r="3.4" {...P} strokeWidth="1.8" /><path {...P} strokeWidth="1.8" d="M13.8 13.6l2.4 2.6" /></>,
   bot: <><rect x="5" y="8" width="14" height="11" rx="2" {...P} strokeWidth="1.8" /><path {...P} strokeWidth="1.8" d="M12 8V5M9.5 16h5" /><circle cx="12" cy="4.2" r="1" fill="currentColor" /><circle cx="9.5" cy="12.5" r="1.1" fill="currentColor" /><circle cx="14.5" cy="12.5" r="1.1" fill="currentColor" /></>,
   user: <><circle cx="12" cy="8" r="3.5" {...P} strokeWidth="1.8" /><path {...P} strokeWidth="1.8" d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></>,
   network: <><circle cx="12" cy="6" r="2.2" {...P} strokeWidth="1.8" /><circle cx="6" cy="17" r="2.2" {...P} strokeWidth="1.8" /><circle cx="18" cy="17" r="2.2" {...P} strokeWidth="1.8" /><path {...P} strokeWidth="1.8" d="M11 8l-4 7M13 8l4 7M8.3 17h7.4" /></>,
@@ -37,12 +37,3 @@ export function Icon({ name, size }: { name: keyof typeof ICONS | string; size?:
   );
 }
 
-export const FoxIcon = () => (
-  <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="8" width="26" height="18" rx="4" fill="#f6851b" /><rect x="3" y="8" width="26" height="5" rx="2" fill="#e2761b" /><rect x="19" y="15" width="10" height="7" rx="2" fill="#fff" opacity=".9" /><circle cx="23" cy="18.5" r="1.6" fill="#e2761b" /></svg>
-);
-export const WcIcon = () => (
-  <svg viewBox="0 0 32 32" aria-hidden="true"><path fill="#3b99fc" d="M9.6 11.4c3.5-3.4 9.2-3.4 12.7 0l.4.4a.4.4 0 010 .6l-1.5 1.4a.2.2 0 01-.3 0l-.6-.6a6.4 6.4 0 00-8.9 0l-.6.6a.2.2 0 01-.3 0L9 12.4a.4.4 0 010-.6zm15.7 2.9l1.3 1.3a.4.4 0 010 .6l-5.9 5.8a.5.5 0 01-.6 0l-4.2-4.1a.1.1 0 00-.2 0l-4.2 4.1a.5.5 0 01-.6 0l-5.9-5.8a.4.4 0 010-.6l1.3-1.3a.5.5 0 01.6 0l4.2 4.1a.1.1 0 00.2 0l4.2-4.1a.5.5 0 01.6 0l4.2 4.1a.1.1 0 00.2 0l4.2-4.1a.5.5 0 01.6 0z" /></svg>
-);
-export const HbarIcon = () => (
-  <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#222" /><path stroke="#fff" strokeWidth="2.4" d="M11 9v14M21 9v14M11 13.5h10M11 18.5h10" fill="none" /></svg>
-);

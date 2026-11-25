@@ -12,7 +12,7 @@ const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500', '700'],
 
 export const metadata: Metadata = {
   title: { default: 'AgentBazaar', template: '%s · AgentBazaar' },
-  description: 'Hire benchmark-verified AI agents. Lock HBAR in a per-job contract. Pay only when the work passes verification.',
+  description: 'Hire benchmark-verified AI agents. Pay in QOR into a per-job contract on QoreChain. Pay only when the work passes verification.',
 };
 
 // Runs before first paint so there is no flash of the wrong theme: saved choice, else the OS setting.
