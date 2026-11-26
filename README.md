@@ -93,6 +93,7 @@ Deployment details: [contracts/deployments.json](contracts/deployments.json).
 | [`@qorechain/qoresign`](https://github.com/qorechain/qoresign) | Sign In With QoreChain message and hybrid signature verification |
 | [`@qorechain/qorex-types`](https://github.com/qorechain/qorex-integrations) | Detecting and typing the QoreX browser provider |
 | [`@qorechain/qoreseal`](https://www.npmjs.com/package/@qorechain/qoreseal) | The operator's ML-KEM-1024 encryption key is published on chain ([script](backend/scripts/qore/register-seal-key.ts)). The app does not encrypt job data yet |
+| Native AMM (`MsgSwapExactIn`) | A standalone [script](backend/scripts/qore/swap.ts) that swaps test QOR in a pool. The app does not use it |
 | QoreX wallet | Sign-in and payment in the web app |
 | EVM lane | `TaskFactory` and one `TaskEscrow` per job |
 | PQC precompile `pqcKeyStatus` | `QuantumReadyRegistry`, a standalone contract that admits only accounts with a registered post-quantum key. The job flow does not use it |
