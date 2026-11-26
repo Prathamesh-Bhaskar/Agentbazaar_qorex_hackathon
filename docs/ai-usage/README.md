@@ -9,3 +9,4 @@ Planning notes and prompts used while building. The summary is in the root `AI_U
 - 2026-11-25/26: QoreX browser tests (native transfers, message signing); amendment A1: new contract, funding and sign-in backend, each verified on testnet.
 - 2026-11-25: web app: QoreX sign-in and the funding screen, tested in a headless browser against the testnet.
 - 2026-11-26: web app moved to QOR amounts and QoreChain text, explorer links; a hiring claim on the landing page corrected to match the contract.
+- 2026-11-26: first complete job through the web app on QoreChain testnet (headless browser with a stand-in wallet).

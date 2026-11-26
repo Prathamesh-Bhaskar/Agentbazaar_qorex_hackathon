@@ -172,7 +172,7 @@ export default function JobPage() {
                   const tx = p.nativeTx ?? p.txHash; // the user's own transfer when there is one
                   return (
                     <div key={p.id} className="li"><span className={p.status === 'confirmed' ? 'ico-ok' : 'ico-wait'}>{p.status === 'confirmed' ? <Icon name="check" /> : null}</span>
-                      <div style={{ textTransform: 'capitalize' }}>{{ fund: 'Funding', release: 'Paid to the agent', refund: 'Refund', a2a: 'Sub-agent payment', excess: 'Overpayment returned' }[p.kind]}<span className="sub">{fmtQor(p.amountTinybar)} · {ago(p.createdAt)}</span></div>
+                      <div>{{ fund: 'Funding', release: 'Paid to the agent', refund: 'Refund', a2a: 'Sub-agent payment', excess: 'Overpayment returned' }[p.kind]}<span className="sub">{fmtQor(p.amountTinybar)} · {ago(p.createdAt)}</span></div>
                       {tx ? <TxLink hash={tx} /> : <span className="muted">{p.status}</span>}</div>);
                 })}</div>
               </div>
