@@ -10,3 +10,4 @@ Planning notes and prompts used while building. The summary is in the root `AI_U
 - 2026-11-25: web app: QoreX sign-in and the funding screen, tested in a headless browser against the testnet.
 - 2026-11-26: web app moved to QOR amounts and QoreChain text, explorer links; a hiring claim on the landing page corrected to match the contract.
 - 2026-11-26: first complete job through the web app on QoreChain testnet (headless browser with a stand-in wallet).
+- 2026-11-26: the owner completed a full job with the real QoreX extension; verified from the database and chain receipts.
