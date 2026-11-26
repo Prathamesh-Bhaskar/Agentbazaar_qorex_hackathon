@@ -128,8 +128,6 @@ Separate projects, each with its own `package.json`.
 | `tools/qorex-test/` | Browser page used to confirm QoreX behaviour | 8765 |
 | `docs/` | Specification and AI usage notes. The older architecture notes there predate this version | - |
 
-`demo-agents/`, `design/` and `backend/postman/` are not updated for QoreChain and are not needed to run the app.
-
 ## Run it
 
 You need Node.js 22+, a PostgreSQL 16+ database (for example [Neon](https://neon.tech)), an
