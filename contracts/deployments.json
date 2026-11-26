@@ -9,6 +9,11 @@
       "operator": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3",
       "verifier": "0xaD35905450242d327dd101A51CE0c040098B493f"
     },
+    "QuantumReadyRegistry": {
+      "address": "0x795c513F82b4f1a7C034FA35f6db60dc9e3FA064",
+      "deployTx": "0xbe721a7ec591bf6e5154047582265942da94570c075daadfbb34d9fafdf0ae27",
+      "deployer": "0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3"
+    },
     "superseded": [
       {
         "address": "0x83CD43960C3634bfCc63D22C971Aa2f9c8477719",

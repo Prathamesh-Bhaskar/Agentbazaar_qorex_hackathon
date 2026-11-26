@@ -10,6 +10,9 @@ Solidity 0.8.24, Foundry. One contract per task covers the whole chain: client -
   hybrid-signed native QOR transfer after release; the operator records that transfer's tx hash (`recordPayout`) once the
   backend has verified it on chain, and an unpaid debt is marked defaulted after the grace period (`markDefault`).
 
+- `QuantumReadyRegistry`: a standalone list that only accounts with a registered post-quantum key can join, checked on
+  chain through QoreChain's `pqcKeyStatus` precompile (`0x…0a02`). The job escrow does not read it.
+
 Amounts are **wei** (1 QOR = 1e18), the unit `msg.value` uses on QoreChain's EVM lane.
 
 Verdicts and sub-leg approvals are EIP-712 messages signed by the platform verifier key; the domain's `verifyingContract`

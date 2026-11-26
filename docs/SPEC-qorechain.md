@@ -63,6 +63,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 | QoreX shows only a recovery phrase, not a private key; its Send screen takes `qor1…` or `@handle`, not `0x…` | QoreX docs and UI |
 
 Deployer account (public): `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3`. Test contract (throwaway): `0xb66Ba6F63f7D25975c44502E02f22f8C9D0ef792`.
+| A contract can read an account's PQC key status through the precompile at `0x0000000000000000000000000000000000000a02` (`pqcKeyStatus(address)` returns `registered`, `algorithmId`, `pubkey`; ABI from `@qorechain/evm` `IQORE_PQC_ABI`), including inside a constructor (26 Nov) | `QuantumReadyRegistry` `0x795c513F82b4f1a7C034FA35f6db60dc9e3FA064`, tx `0xbe721a7ec591bf6e5154047582265942da94570c075daadfbb34d9fafdf0ae27`, gas 367,917; `isQuantumReady` true for the operator and the QoreX account, false for an account with no key; its `register()` simulated from that account reverts `NotQuantumReady` |
 Secrets (`QORE_DEPLOYER_PRIVATE_KEY`, `QORE_PQC_RECOVERY_CODE`) live only in git-ignored `.env` files.
 
 Accounts (public addresses; keys and PQC recovery codes are in the git-ignored `backend/.env`):
@@ -166,7 +167,8 @@ Verify precompile. Only after its ABI is read from the official docs and confirm
   an EVM transaction with QoreX. Funding design needs a decision (native transfer + on-chain confirmation, or MetaMask).
   Browser test passed 25 Nov (see section 2). Decision: option 1, QoreX only (login by transaction or signature,
   funding by native transfer).
-- **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`).
+- **Q2** ABI and gas of the PQC Verify precompile (`0x…0A01`). Still open for signature verification; only the key status
+  precompile (`0x…0a02`) has been tested (section 2).
 - **Q3** Finality and reorg behaviour of the EVM RPC.
 - **Q4** ANSWERED 18 Nov: the factory and a `TaskEscrow` created through it work, including fund, submit and release.
 - **Q5** PARTLY ANSWERED 18 Nov: getLogs range is limited to under 10,000 blocks (indexer chunks at 5,000). Request-rate limits are still unknown.

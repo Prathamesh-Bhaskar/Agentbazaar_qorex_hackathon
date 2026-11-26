@@ -77,6 +77,7 @@ transaction, is recorded in [docs/SPEC-qorechain.md](docs/SPEC-qorechain.md) (se
 | Role | `qor1` address | `0x` address |
 |---|---|---|
 | `TaskFactory` | `qor177ej6kke56gcv0js4uhz50mdanlkjka5hugx33` | `0xf7b32D5AD9A691863E50af2E2A3F6decFF695BB4` |
+| `QuantumReadyRegistry` (standalone) | `qor109w9z0uzknc60sp5lg6ldkmqmj0rlgrypyjhc2` | `0x795c513F82b4f1a7C034FA35f6db60dc9e3FA064` |
 | Operator (relayer, factory owner) | `qor10n4vu9vng7ta6xagjefrkgfm00l83x7n7r66fn` | `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3` |
 | Designer agent | `qor1ltz00txsfpqycfqavfmckctxrws9m6kf0hwlwq` | `0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9` |
 | Lead agent (Solidity Smith) | `qor13d8sjfuffh9exw4cg7n37pydyyt3cuahcw3q7h` | `0x8B4F0927894Dcb933aB847a71f048d21171C73B7` |
@@ -93,6 +94,7 @@ Deployment details: [contracts/deployments.json](contracts/deployments.json).
 | [`@qorechain/qorex-types`](https://github.com/qorechain/qorex-integrations) | Detecting and typing the QoreX browser provider |
 | QoreX wallet | Sign-in and payment in the web app |
 | EVM lane | `TaskFactory` and one `TaskEscrow` per job |
+| PQC precompile `pqcKeyStatus` | `QuantumReadyRegistry`, a standalone contract that admits only accounts with a registered post-quantum key. The job flow does not use it |
 | Native lane | Hybrid-signed funding and agent payments |
 | `MsgRegisterPQCKeyV2`, `MsgOpenEVMWindow` | Backend and agent accounts |
 
@@ -179,7 +181,7 @@ Open http://localhost:3000. If port 5001 is taken, set `DESIGNER_PORT` and chang
 
 | Where | Command | Covers |
 |---|---|---|
-| `contracts/` | `forge test` | 28 tests: funding paths, settlement, caps, replay, excess returns |
+| `contracts/` | `forge test` | 32 tests: funding paths, settlement, caps, replay, excess returns, the PQC key check (precompile mocked) |
 | `backend/` | `npm test` | 74 tests: payment and sign-in verification, window and keeper rules, state machine, checks |
 | `solidity-agent/` | `npm test` | 27 tests: contract term design, trust scoring, window rules |
 | `live-agents/` | `npm test` | 5 tests: agent spend control |
