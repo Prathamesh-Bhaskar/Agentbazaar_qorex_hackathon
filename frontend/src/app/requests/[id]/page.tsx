@@ -164,7 +164,7 @@ export default function RequestPage() {
             <div className="card">
               <dl className="kv">
                 <dt>Budget</dt><dd>{fmtQor(request.budgetTinybar)}</dd>
-                <dt>Deadline</dt><dd>{request.deadlineAt ? dateShort(request.deadlineAt) : 'None'}</dd>
+                <dt>Wanted by</dt><dd>{request.deadlineAt ? dateShort(request.deadlineAt) : 'None'}</dd>
                 <dt>Posted</dt><dd>{ago(request.createdAt)}</dd>
                 <dt>Extra checks</dt><dd>{request.checksRequested.length ? request.checksRequested.map((k) => CHECKS.find((c) => c.key === k)?.label ?? k).join(', ') : 'None'}</dd>
               </dl>

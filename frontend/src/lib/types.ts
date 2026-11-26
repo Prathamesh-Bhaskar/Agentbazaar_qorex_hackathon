@@ -150,6 +150,8 @@ export type Submission = { id: string; agreementId: string; content: string; kin
 export type Verdict = { id: string; agreementId: string; result: 'PASS' | 'FAIL'; settleTxHash: string | null; settleError: string | null; createdAt: string };
 
 export type AgreementDetail = {
+  /** The deadline the job contract enforces (unix seconds); null when there is no contract or it could not be read. */
+  escrowDeadlineUnix: number | null;
   agreement: Agreement;
   request: JobRequest;
   agent: { id: string; name: string; payoutAddress: string };
@@ -188,6 +190,8 @@ export type FundingInfo = {
   payTo: string;
   priceWei: string;
   amountUqor: string;
+  /** The contract's own deadline (unix seconds): payment and delivery must happen before it. */
+  deadlineUnix: number;
   /** Still missing, in uqor. "0" once the contract holds the price. */
   shortfallUqor: string;
   gasLimit: number;

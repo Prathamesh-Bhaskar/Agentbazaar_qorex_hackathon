@@ -158,6 +158,20 @@ export const taskBalance = (task: Address) => retryRead(() => publicClient.getBa
 export const readDeadline = async (task: Address) =>
   Number(await retryRead(() => publicClient.readContract({ address: task, abi: taskEscrowAbi, functionName: 'deadline' })));
 
+const deadlines = new Map<string, number>();
+/** A contract's deadline never changes, so it is read once and remembered. For pages: answers quickly or throws. */
+export async function escrowDeadline(task: Address, timeoutMs = 4_000): Promise<number> {
+  const known = deadlines.get(task.toLowerCase());
+  if (known !== undefined) return known;
+  let timer: NodeJS.Timeout | undefined;
+  const value = await Promise.race([
+    readDeadline(task),
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ChainError('Timed out reading the deadline')), timeoutMs); }),
+  ]).finally(() => clearTimeout(timer));
+  deadlines.set(task.toLowerCase(), value);
+  return value;
+}
+
 export const submitOnChain = (task: Address, deliverableHash: Hex) =>
   send({ address: task, abi: taskEscrowAbi, functionName: 'submit', args: [deliverableHash], gas: GAS.submit });
 

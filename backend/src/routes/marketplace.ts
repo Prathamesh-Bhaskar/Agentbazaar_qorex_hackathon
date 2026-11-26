@@ -7,7 +7,7 @@ import { requireAgent, requireUser } from '../lib/auth.js';
 import { ensureTask, loadDesignInputs, payoutUrl } from '../chain/ops.js';
 import { legInstructions, reportPayout } from '../chain/payoutReport.js';
 import { fundingInstructions, reportFunding } from '../chain/funding.js';
-import { taskBalance } from '../chain/client.js';
+import { escrowDeadline, taskBalance } from '../chain/client.js';
 import { requestDesign } from '../designer/client.js';
 import { dispatchTask, requestQuotes } from '../agents/dispatch.js';
 import { summarizeAgents } from '../lib/agentSummary.js';
@@ -183,7 +183,10 @@ export async function marketplaceRoutes(app: FastifyInstance) {
     const subLegs = await db.select().from(schema.subLegs).where(eq(schema.subLegs.agreementId, id));
     const calleeRows = subLegs.length ? await db.select({ id: schema.agents.id, name: schema.agents.name }).from(schema.agents).where(inArray(schema.agents.id, subLegs.map((l) => l.calleeAgentId))) : [];
     const calleeName = new Map(calleeRows.map((c) => [c.id, c.name]));
+    // The deadline the contract enforces (set by the designer), which is what payment and delivery must meet. null = not readable now.
+    const escrowDeadlineUnix = agreement.escrowAddress ? await escrowDeadline(agreement.escrowAddress as Address).catch(() => null) : null;
     return {
+      escrowDeadlineUnix,
       agreement, request, agent, submission: submission ?? null, verdict: verdict ?? null, payments,
       terms: specRow ? { spec: specRow.spec, specHash: specRow.specHash, source: specRow.source } : null,
       subLegs: subLegs.map((l) => ({ ...l, calleeName: calleeName.get(l.calleeAgentId), payUrl: payoutUrl(id, l.legId) })),
@@ -254,10 +257,10 @@ export async function marketplaceRoutes(app: FastifyInstance) {
     const [a] = await db.select().from(schema.agreements).where(eq(schema.agreements.id, id)).limit(1);
     if (!a) return reply.code(404).send({ error: 'Agreement not found' });
     if (!a.escrowAddress) return reply.code(409).send({ error: 'Task contract not deployed yet; retry POST /agreements/:id/escrow' });
-    let balance: bigint;
-    try { balance = await taskBalance(a.escrowAddress as Address); }
+    let balance: bigint, deadlineUnix: number;
+    try { [balance, deadlineUnix] = [await taskBalance(a.escrowAddress as Address), await escrowDeadline(a.escrowAddress as Address)]; }
     catch { return reply.code(503).send({ error: 'Could not read the task contract; try again' }); }
-    return { status: a.status, taskContract: a.escrowAddress, ...fundingInstructions(a.escrowAddress as Address, BigInt(a.priceTinybar), balance) };
+    return { status: a.status, taskContract: a.escrowAddress, deadlineUnix, ...fundingInstructions(a.escrowAddress as Address, BigInt(a.priceTinybar), balance) };
   });
 
   // The client reports the transfer. It is read from the chain and checked; nothing in the request is trusted.

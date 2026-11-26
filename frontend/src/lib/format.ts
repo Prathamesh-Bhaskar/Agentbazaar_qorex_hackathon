@@ -29,3 +29,16 @@ export function errMessage(e: unknown): string {
   if (any?.code === 4001 || /user rejected|user denied|rejected the request/i.test(any?.message ?? '')) return 'You cancelled the request in your wallet.';
   return any?.shortMessage ?? any?.message ?? 'Something went wrong.';
 }
+
+/** Seconds before a contract's deadline when the app stops offering payment: a transfer and its confirmation need time. */
+export const PAYMENT_MARGIN_SECS = 120;
+
+/** "26 Nov, 23:51 (in 2 h 40 min)" or "26 Nov, 23:51 (passed)", from a contract's unix deadline. */
+export function deadlineText(unix: number, nowMs = Date.now()): string {
+  const when = new Date(unix * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const left = Math.floor(unix - nowMs / 1000);
+  if (left <= 0) return `${when} (passed)`;
+  const d = Math.floor(left / 86400), h = Math.floor((left % 86400) / 3600), m = Math.floor((left % 3600) / 60);
+  const span = d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : m ? `${m} min` : 'under a minute';
+  return `${when} (in ${span})`;
+}

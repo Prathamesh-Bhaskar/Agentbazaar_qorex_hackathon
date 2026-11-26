@@ -102,7 +102,7 @@ export default function PostJob() {
               <Field label="Budget (QOR)" hint="The most you will pay. Quotes above it are not accepted." error={errs.budget}>
                 <input id="budget" className="input" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
               </Field>
-              <Field label="Deadline" hint="End of that day in your local time. If nothing is delivered by the job’s deadline, the contract returns your QOR." error={errs.deadline}>
+              <Field label="Deadline" hint="When you would like it by. When you accept a quote, the job’s contract sets its own deadline (usually a few hours). You pay and the agent delivers before that, or your QOR is returned." error={errs.deadline}>
                 <input id="deadline" type="date" className="input" min={inDays(1)} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
               </Field>
             </div>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiErrorText } from '@/lib/api';
 import { FAUCET_URL } from '@/lib/config';
+import { deadlineText, PAYMENT_MARGIN_SECS } from '@/lib/format';
 import { fmtQor, fmtUqor, WEI_PER_UQOR } from '@/lib/money';
 import { connectQorex, requireAccount, sendQor, WalletError } from '@/lib/qorex';
 import type { AgreementDetail, FundingInfo, FundingReport } from '@/lib/types';
@@ -23,6 +24,7 @@ const keyFor = (id: string) => `agentbazaar.funding.${id}`;
 const loadPending = (id: string) => (typeof window === 'undefined' ? null : localStorage.getItem(keyFor(id)));
 const savePending = (id: string, hash: string | null) => (hash ? localStorage.setItem(keyFor(id), hash) : localStorage.removeItem(keyFor(id)));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const windowClosed = (deadlineUnix: number) => Date.now() / 1000 > deadlineUnix - PAYMENT_MARGIN_SECS;
 
 function Steps({ stage }: { stage: Stage }) {
   const at = AT[stage];
@@ -109,7 +111,7 @@ export default function FundCard({ a, isClient, signedIn, onFunded }: {
       const { provider, account } = await connectQorex();
       requireAccount(account, session.qorAddress!);
       const fresh = await api<FundingInfo>(`/agreements/${a.id}/funding`); // pay only what is missing right now
-      if (fresh.shortfallUqor === '0') { setStage('idle'); void funding.refetch(); return; }
+      if (fresh.shortfallUqor === '0' || windowClosed(fresh.deadlineUnix)) { setStage('idle'); void funding.refetch(); return; }
       hash = (await sendQor(provider, account, fresh.payTo, BigInt(fresh.shortfallUqor), fresh.gasLimit)).txHash;
     } catch (e) {
       setStage('idle');
@@ -135,6 +137,7 @@ export default function FundCard({ a, isClient, signedIn, onFunded }: {
   const tooLittle = shortfall !== null && have !== null && have < shortfall + FEE_UQOR;
   const covered = shortfall === 0n;
   const busy = stage === 'wallet' || stage === 'checking';
+  const closed = !!f && windowClosed(f.deadlineUnix); // re-evaluated on every refresh of the funding query
 
   return (
     <div className="stack">
@@ -143,6 +146,7 @@ export default function FundCard({ a, isClient, signedIn, onFunded }: {
         <div className="amt">{fmtQor(a.priceTinybar)}</div>
         <div className="k">Contract made for this job</div>
         <div className="addr">{f?.payTo ?? a.escrowAddress}</div>
+        {f && <><div className="k">Pay and deliver before</div><div className="addr">{deadlineText(f.deadlineUnix)}</div></>}
         <div className="meta"><span>Released to the agent only on PASS</span><span>Returned to you on FAIL or if the deadline passes</span></div>
       </div>
       <div className="card">
@@ -158,6 +162,11 @@ export default function FundCard({ a, isClient, signedIn, onFunded }: {
             <button className="btn btn-primary btn-lg" onClick={() => void report(pending)}>Check payment</button>
             <button className="link" style={{ alignSelf: 'flex-start' }} onClick={() => { if (window.confirm('Forget this payment? Only do this if QoreX shows it failed. Paying again could pay twice; any excess is returned when the job settles.')) { settle(null); setMessage(undefined); } }}>The transfer failed in QoreX: start over</button>
           </div>
+        ) : closed ? (
+          <Notice kind="warn">
+            The payment window for this job has closed: its contract’s deadline {f.deadlineUnix * 1000 > Date.now() ? 'is less than two minutes away' : 'has passed'}. Do not send money to it. Post the job again to get a new contract.
+            {BigInt(f.shortfallUqor) < BigInt(f.amountUqor) && ' What you already sent is returned to you automatically after the deadline.'}
+          </Notice>
         ) : (
           <div className="stack" style={{ gap: 12 }}>
             {tooLittle && <Notice kind="warn">Your wallet holds {fmtUqor(have!)}, less than {fmtUqor(shortfall!)} plus the network fee. <a className="link" href={FAUCET_URL} target="_blank" rel="noopener noreferrer">Get test QOR</a></Notice>}

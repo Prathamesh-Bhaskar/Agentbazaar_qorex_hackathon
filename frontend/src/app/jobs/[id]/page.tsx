@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorText } from '@/lib/api';
-import { ago, errMessage, shortAddr } from '@/lib/format';
+import { ago, deadlineText, errMessage, shortAddr } from '@/lib/format';
 import { addressUrl, EXPLORER_HINT } from '@/lib/explorer';
 import TxLink from '@/components/TxLink';
 import { fmtQor } from '@/lib/money';
@@ -187,7 +187,7 @@ export default function JobPage() {
             <div className="card">
               <dl className="kv">
                 <dt>Price</dt><dd>{fmtQor(a.priceTinybar)}</dd>
-                <dt>Deadline</dt><dd>{a.deadlineAt ? new Date(a.deadlineAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'None'}</dd>
+                <dt>Contract deadline</dt><dd style={{ wordBreak: 'normal', overflowWrap: 'normal' }}>{d.escrowDeadlineUnix ? deadlineText(d.escrowDeadlineUnix) : a.escrowAddress ? 'Could not read it' : 'Set when the contract is deployed'}</dd>
                 <dt>Agent payout</dt><dd className="mono" style={{ fontSize: 12.5 }}>{shortAddr(d.agent.payoutAddress)}</dd>
                 {a.escrowAddress && <><dt>Contract</dt><dd><a className="link mono" style={{ fontSize: 12.5 }} href={addressUrl(a.escrowAddress)} title={EXPLORER_HINT} target="_blank" rel="noopener noreferrer">{shortAddr(a.escrowAddress)}<Icon name="ext" size={13} /></a></dd></>}
                 {d.terms && <><dt>Pass mark</dt><dd>{d.terms.spec.passThresholdPct}%</dd><dt>Sub-agent cap</dt><dd>{(d.terms.spec.maxSubBps / 100).toFixed(0)}%</dd></>}

@@ -194,7 +194,8 @@ Open http://localhost:3000. If port 5001 is taken, set `DESIGNER_PORT` and chang
   becomes a FAIL verdict.
 - The five demo agents are seeded and shown as not benchmarked. Listing your own agent (GitHub repository plus
   benchmark) was not re-tested in this version.
-- The job's deadline on chain is set by the designer (usually hours) and can be earlier than the date the client picked.
+- A job's on-chain deadline is set by the designer (usually hours), not by the date the client picks. The job page and
+  the payment card show it.
 - The explorer does not look up EVM transaction hashes and has no link that selects testnet.
 
 ## AI usage

@@ -12,3 +12,4 @@ Planning notes and prompts used while building. The summary is in the root `AI_U
 - 2026-11-26: first complete job through the web app on QoreChain testnet (headless browser with a stand-in wallet).
 - 2026-11-26: the owner completed a full job with the real QoreX extension; verified from the database and chain receipts.
 - 2026-11-26: README rewritten for QoreChain with proof transactions; account setup script added.
+- 2026-11-26: the web app shows each contract's own deadline and stops offering payment as it closes.
