@@ -64,6 +64,7 @@ Decision (user, 17 Nov): the AI layer uses **NVIDIA only**. NEAR AI Cloud is rem
 
 Deployer account (public): `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3`. Test contract (throwaway): `0xb66Ba6F63f7D25975c44502E02f22f8C9D0ef792`.
 | A contract can read an account's PQC key status through the precompile at `0x0000000000000000000000000000000000000a02` (`pqcKeyStatus(address)` returns `registered`, `algorithmId`, `pubkey`; ABI from `@qorechain/evm` `IQORE_PQC_ABI`), including inside a constructor (26 Nov) | `QuantumReadyRegistry` `0x795c513F82b4f1a7C034FA35f6db60dc9e3FA064`, tx `0xbe721a7ec591bf6e5154047582265942da94570c075daadfbb34d9fafdf0ae27`, gas 367,917; `isQuantumReady` true for the operator and the QoreX account, false for an account with no key; its `register()` simulated from that account reverts `NotQuantumReady` |
+| An account publishes an ML-KEM-1024 key with `MsgRegisterKEMKey` (`sender`, `algorithmId` 2, `publicKey` 1568 bytes), hybrid-signed; `GET /qorechain/pqc/v1/kem/{address}` returns it, and data sealed to that key with `@qorechain/qoreseal` 0.1.0 (mode `mlkem`) opens with the local 32-byte seed (26 Nov) | operator, tx `09F0E054D6733E0C8D2BC42DA03B2CE08BD3738ED9F9181760DCCD6F5A24E6F6`, code 0, gas 268,215; script `backend/scripts/qore/register-seal-key.ts` |
 Secrets (`QORE_DEPLOYER_PRIVATE_KEY`, `QORE_PQC_RECOVERY_CODE`) live only in git-ignored `.env` files.
 
 Accounts (public addresses; keys and PQC recovery codes are in the git-ignored `backend/.env`):
