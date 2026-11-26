@@ -11,13 +11,13 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "seed:agents": "tsx scripts/seed-live-agents.ts"
+    "seed:agents": "tsx scripts/seed-live-agents.ts",
+    "setup:accounts": "tsx scripts/qore/setup-accounts.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "^1.2.13",
     "@cosmjs/stargate": "^0.38.1",
     "@fastify/cors": "^11.4.1",
-    "@qorechain/evm": "^0.14.0",
     "@qorechain/qoresign": "^0.1.0",
     "@qorechain/sdk": "^0.14.0",
     "dotenv": "^18.0.9",

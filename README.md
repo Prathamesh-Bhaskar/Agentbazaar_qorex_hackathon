@@ -1,279 +1,206 @@
 # AgentBazaar
 
-**A marketplace where AI agents take jobs, hire other agents to finish them, and get paid from escrow only when the verified work passes.**
+**AI agents take jobs, hire other agents, and get paid from escrow only when the verified work passes, on QoreChain with post-quantum signatures.**
 
-Built for **NEAR Hackathon** (tracks: Agent Economy, AI Swarms, Privacy & Private AI).
-**NEAR AI Cloud**(private inference in a TEE) and are signed and checkable.
+Built for **Build Before Q-Day, the QoreChain Developer Fest** (category: Post-Quantum AI Agents). Runs on the
+`qorechain-diana` testnet.
 
-> Working names in this repo: the web app is branded **AgentBazaar** (earlier: **Attestra**), the backend, docs and
-> repository still use **AgentForge** or **Attestra** in places, and the HTML prototype in `design/` was called
-> Gigiverse. They are the same project.
+> **Testnet only.** A hackathon MVP. The contracts are not audited, and the automated verification is not a professional
+> security audit. Never use a funded or personal key with it.
 
-> **Testnet only.** This is a hackathon MVP. The contracts are not audited, and the AI verification is not a professional
-> security audit. Never use a funded or personal wallet with it.
+## What happens in one job
 
----
+1. A client **signs in with QoreX** (a hybrid post-quantum signature, no transaction) and posts a job.
+2. Listed agents quote. The client accepts one, and a **designer agent** sets the terms and deploys a dedicated
+   `TaskEscrow` contract for that job.
+3. The client **pays with QoreX**: a native QOR transfer to the job's contract. The backend checks it on chain and marks
+   the contract funded.
+4. The lead agent does the work and may **hire a specialist agent** inside the same job, within a cap the contract
+   enforces. A hired agent cannot hire further agents.
+5. The delivery is checked by fixed code checks and a **model review (NVIDIA-hosted)**. A verifier key signs PASS or FAIL.
+6. PASS: the contract pays the lead agent exactly the price. FAIL or a missed deadline: the client is refunded.
+7. The lead agent **pays its sub-agent** with a post-quantum-signed QOR transfer. The backend verifies that transfer on
+   chain before the contract records it. An unpaid debt is marked defaulted after a grace period.
 
-## Highlights
-
-| | |
-|---|---|
-| **Agent swarms** | A lead agent splits a job and hires specialist agents (auditor, test writer, docs writer). Sub-agents can hire sub-agents, up to **two levels** deep. The client gets one result from one escrow. |
-| **Agent economy** | Every agent is a small business: benchmarked before listing (80 or more), quotes in HBAR, is paid when its work passes, and pays the agents it hires over **Hedera x402**. Every payment is a HashScan receipt. |
-| **Pay on proof** | Funds sit in a per-job `TaskEscrow` contract. An automated verifier signs a verdict (EIP-712); PASS pays, FAIL or a missed deadline refunds. Infrastructure outages never count as a failed job. |
-| **NEAR AI private inference** | The benchmark review, job checklists, verification judgement and the five live agents all run on NEAR AI Cloud. Each AI verdict stores a response-signature proof. See [NEAR AI integration](#near-ai-integration). |
-
----
-
-## What it does
-
-A marketplace where AI agents are listed, hired and paid on-chain.
-
-- **Benchmark-gated listing.** A lister connects a GitHub repo (public, or private through GitHub OAuth). The backend
-  reads the code, runs plain-code checks, and has a NEAR AI-hosted model (private inference in a TEE) review it. Score >= 80/100 lists the agent.
-- **One contract per job.** When a client accepts a quote, a **Solidity designer agent** analyses the requirement and the
-  provider's track record, designs bounded contract terms, and deploys a `TaskEscrow` for that job on Hedera.
-- **HBAR escrow.** The client locks the price in the contract (from a wallet with `fund()`, or over x402).
-  Money states in the database change only after the on-chain event is indexed.
-- **Verified delivery.** When the agent submits, the work is checked against a checklist generated from the client's
-  requirement, plus the code and security checks the client ticked. A platform key signs the verdict (EIP-712).
-  PASS releases the HBAR to the agent. FAIL, or a missed deadline, refunds the client.
-- **Agent-to-agent (A2A) payments.** The hired agent can hire a sub-agent inside the same job (max 2 hops). The
-  sub-agent's price is added as a leg of the contract, capped as a share of the job price. After release, the hiring
-  agent pays the sub-agent over **Hedera x402**, and the contract records the receipt. An unpaid debt is marked
-  defaulted on-chain after a grace period and counts against that agent's trust score.
-
-If an external service is down (NEAR AI, GitHub, the chain, 0G), the app shows an error and lets you retry. An outage
-never produces a FAIL verdict, and nothing is faked.
-
----
-
-## NEAR AI integration
-
-NEAR AI Cloud is the default LLM provider (`LLM_PROVIDER=near`). It is OpenAI-compatible at
-`https://cloud-api.near.ai/v1`, and its models run in a trusted execution environment (TEE). `LLM_PROVIDER=nvidia`
-is kept as an explicit alternative; there is no silent switching between the two.
-
-**Where it is used**
-
-| Use | Code |
-|---|---|
-| Benchmark review (score >= 80 lists an agent) | [backend/src/routes/benchmark.ts](backend/src/routes/benchmark.ts), [backend/src/lib/analyzer.ts](backend/src/lib/analyzer.ts) |
-| Checklists and verification judgement | [backend/src/lib/llm.ts](backend/src/lib/llm.ts) |
-| Requirement analysis by the designer agent | [solidity-agent/src/analyze.ts](solidity-agent/src/analyze.ts) |
-| The five live agents | [live-agents/](live-agents/) |
-| Model catalog for the listing form (public, no key) | [backend/src/lib/nearModels.ts](backend/src/lib/nearModels.ts) |
-
-**Verifiable inference (proof).** For each benchmark and verification, the backend:
-
-1. fetches the model's attestation with a fresh nonce,
-2. sends the completion through raw `fetch`, so the exact request and response bytes can be hashed,
-3. fetches NEAR's ECDSA response signature,
-4. recovers the signer and matches it to the attestation and nonce ([backend/src/lib/nearProof.ts](backend/src/lib/nearProof.ts)),
-5. stores the proof with the verdict, and the UI shows a badge: `tee_signature` (signed by a model TEE key),
-   `gateway_signature` (signed by the NEAR gateway, not bound to a model TEE) or `unverified`.
-
-**Honest limits.** We check the signature against the attestation, not the Intel TDX / NVIDIA hardware quote itself.
-A proof never changes a verdict. If NEAR AI is down, the app shows an error and you can retry; it never produces a FAIL.
-
-## How a job flows
-
-```
-requested -> quoted -> agreed -> funded -> submitted -> verifying -> released | refunded
+```mermaid
+sequenceDiagram
+    participant C as Client (QoreX)
+    participant B as Backend
+    participant E as TaskEscrow (EVM lane)
+    participant A as Lead agent
+    participant S as Sub-agent
+    C->>B: sign in (signArbitrary, hybrid)
+    C->>B: post job, accept quote
+    B->>E: designer deploys the job contract
+    C->>E: native QOR transfer (hybrid)
+    B->>E: confirmFunding()
+    B->>A: task
+    A->>B: hire sub-agent
+    B->>E: addSubLeg()
+    B->>S: sub-task
+    A->>B: deliverable
+    B->>E: release() with a signed PASS verdict
+    E->>A: pays the price
+    A->>S: native QOR transfer (hybrid)
+    A->>B: tx hash
+    B->>E: recordPayout() after verifying on chain
 ```
 
-1. **Client posts a request**: requirements, budget in HBAR, deadline, and which checks to run
-   (`build_config`, `lint_rules`, `secrets_scan`, `dependency_check`, `security_review`).
-2. **Agents quote.** The backend asks listed agents (their `POST /quote`); listers can also quote by hand.
-3. **Client previews the terms** the designer would set, then **accepts a quote**. The designer deploys the `TaskEscrow`.
-4. **Client funds** the contract: `fund()` from MetaMask, or an x402 payment through the gateway.
-5. The indexer sees the `Funded` event and sets the job to `funded`. The backend then tells the agent to start
-   (`POST {agent}/tasks`). Agents behind NAT can poll `GET /agent/tasks` instead.
-6. The agent may **hire a sub-agent** (`POST /a2a/quote`, then `POST /a2a/call`).
-7. The agent **submits** the work (`POST /agreements/:id/submit`). Verification starts automatically.
-8. The verifier key signs the verdict, and the relayer calls `release` or `refund`. The indexer sets `released` or
-   `refunded`.
-9. After release, the hiring agent pays each sub-agent over x402. The backend records the Hedera transaction id on the
-   contract.
+## Post-quantum, and where it stops
 
-### Where things live
+| Action | Signature | How it is enforced |
+|---|---|---|
+| Sign in | secp256k1 **+ ML-DSA-87** (QoreX `signArbitrary`) | The backend verifies both against the key registered on chain and refuses a classical-only signature |
+| Client funding | secp256k1 **+ ML-DSA-87** (native transfer) | Required by the chain; the backend also checks for the extension |
+| Agent-to-agent payment | secp256k1 **+ ML-DSA-87** (native transfer signed by the agent) | The backend refuses to record a payment without the ML-DSA-87 extension |
+| Backend contract calls (operator, designer) | classical EVM signature, **inside an EVM window** opened by a hybrid-signed message | The chain admits them only for an account with a registered post-quantum key and an open window, bounded in blocks, transactions and value |
+| Verdict (PASS / FAIL) | **classical only** (EIP-712, secp256k1) | The contract checks the verifier's signature. A post-quantum verdict check is not built |
 
-| Chain / service | Holds |
+## Proof on chain
+
+A complete job run from the web app with the QoreX browser extension on 26 November 2026. The explorer opens on mainnet:
+**select Testnet** to see these.
+
+| Step | Transaction |
 |---|---|
-| **Hedera testnet** (chain id 296) | `TaskFactory`, one `TaskEscrow` per job, all HBAR, x402 payments |
-| **Neon Postgres** | users, agents, requests, quotes, agreements, verifications, verdicts, sub-legs, chain events |
-| **NEAR AI Cloud** (OpenAI-compatible, TEE) | benchmark review, checklist generation, verification judgement, agent LLM calls. A response-signature proof is stored with each benchmark and verification (see `docs/SPEC-near-ai.md`) |
-| **0G Storage** (optional) | reports. Without a 0G key they stay in Postgres |
-| **GitHub** | repo contents for benchmarks and verification |
+| Client funds 0.5 QOR (native, hybrid) | [`922E7D5C…6B79`](https://explore.qore.network/tx/922E7D5CD33B5466B1493DD3D6C7B3756230A02A2DD9D1531566124AFFD06B79) |
+| Contract releases to the lead agent (EVM) | `0x114ea8a76e18a8a7d2d29a8307b2ffe9f144c2080348b4ad970e0a05f8d89727` |
+| Lead agent pays its sub-agent 0.04 QOR (native, hybrid) | [`6E244EFA…5691`](https://explore.qore.network/tx/6E244EFA8363E435A981AE4A4F33352DE30A490DD77C422EEF1673BEF6A85691) |
+| Job contract (empty after settlement) | [`0x220600fef6784a7402ea48fd9699b8642e7d47ac`](https://explore.qore.network/address/0x220600fef6784a7402ea48fd9699b8642e7d47ac) |
 
----
+The explorer does not look up EVM hashes; check them with
+`cast receipt <hash> --rpc-url https://evm-testnet.qore.host`. Every chain behaviour the code relies on, with its
+transaction, is recorded in [docs/SPEC-qorechain.md](docs/SPEC-qorechain.md) (section 2).
+
+### Testnet addresses
+
+| Role | `qor1` address | `0x` address |
+|---|---|---|
+| `TaskFactory` | `qor177ej6kke56gcv0js4uhz50mdanlkjka5hugx33` | `0xf7b32D5AD9A691863E50af2E2A3F6decFF695BB4` |
+| Operator (relayer, factory owner) | `qor10n4vu9vng7ta6xagjefrkgfm00l83x7n7r66fn` | `0x7CeaCe15934797DD1BA896523B213b7Bfe789BD3` |
+| Designer agent | `qor1ltz00txsfpqycfqavfmckctxrws9m6kf0hwlwq` | `0xFAc4f7Acd048404C241d62778B61661Ba05DeAC9` |
+| Lead agent (Solidity Smith) | `qor13d8sjfuffh9exw4cg7n37pydyyt3cuahcw3q7h` | `0x8B4F0927894Dcb933aB847a71f048d21171C73B7` |
+| Sub-agent (Audit Hawk) | `qor1a22ns5dl0auy46l3awhune9fdkh8z94nw3g0c2` | `0xeA953851bF7f784aeBf1EBaFc9E4A96daE7116B3` |
+
+Deployment details: [contracts/deployments.json](contracts/deployments.json).
+
+## QoreChain kits and network features
+
+| Used | For |
+|---|---|
+| [`@qorechain/sdk`](https://github.com/qorechain/qorechain-sdk) | PQC key registration, hybrid signing, EVM windows, address forms |
+| [`@qorechain/qoresign`](https://github.com/qorechain/qoresign) | Sign In With QoreChain message and hybrid signature verification |
+| [`@qorechain/qorex-types`](https://github.com/qorechain/qorex-integrations) | Detecting and typing the QoreX browser provider |
+| QoreX wallet | Sign-in and payment in the web app |
+| EVM lane | `TaskFactory` and one `TaskEscrow` per job |
+| Native lane | Hybrid-signed funding and agent payments |
+| `MsgRegisterPQCKeyV2`, `MsgOpenEVMWindow` | Backend and agent accounts |
+
+Also: Solidity, Foundry and forge-std, viem, CosmJS (`@cosmjs/stargate`, `cosmjs-types`), Fastify, Zod, Drizzle,
+PostgreSQL, Next.js, and NVIDIA-hosted models.
+
+## What we learned about the chain
+
+- A web page cannot sign EVM transactions or open EVM windows through QoreX, and a cross-VM call cannot carry value into
+  the EVM lane. So clients fund a job with a **native transfer** to its contract and `confirmFunding()` reads the
+  balance. The backend also triggers refunds, because the client cannot send that call.
+- An EVM window expires by block count and a reverted transaction is charged its full gas limit, so the backend manages
+  windows itself ([backend/src/chain/window.ts](backend/src/chain/window.ts)) and checks before sending.
+- `eth_getLogs` refuses ranges of 10,000 blocks or more, so the indexer reads in chunks.
+- QoreX signs a sign-in text as a plain message, so the backend uses the message verifier and checks the sign-in fields
+  itself ([backend/src/lib/signIn.ts](backend/src/lib/signIn.ts)).
 
 ## Repository layout
 
-Separate projects, each with its own `package.json`. There is no monorepo tooling.
+Separate projects, each with its own `package.json`.
 
-| Folder | What it is | Default port |
+| Folder | What it is | Port |
 |---|---|---|
-| `backend/` | Fastify + Zod API, Drizzle on Postgres, chain client (viem), mirror-node indexer, x402 gateway | 4000 (API), 4402 (gateway) |
-| `contracts/` | Foundry project: `TaskEscrow`, `TaskFactory` (Solidity 0.8.24) | - |
-| `solidity-agent/` | The designer agent: scores trust, designs the terms, deploys the task contract | 5001 |
-| `live-agents/` | Five single-prompt LLM agents (NEAR AI), one server each (Solidity dev, auditor, test writer, docs writer, dApp dev) | 5101-5105 |
-| `demo-agents/` | The Static Auditor agent (reviews code in any language) | 5002 |
-| `frontend/` | Next.js 16 app, wagmi + viem, MetaMask on Hedera testnet. Light and dark themes, NEAR AI-inspired styling | 3000 |
-| `design/` | Static HTML prototype used as the UI reference | - |
-| `docs/` | Architecture and build-plan docs (written mid-project; the code is the source of truth where they differ) | - |
+| `contracts/` | Foundry: `TaskFactory`, `TaskEscrow` (Solidity 0.8.24) | - |
+| `backend/` | Fastify API, PostgreSQL (Drizzle), chain client, window manager, event indexer and keeper, verification | 4000 |
+| `solidity-agent/` | Designer agent: scores trust, designs the terms, deploys the job contract | 5001 |
+| `live-agents/` | Five LLM agents (Solidity, auditor, tests, docs, dApp) that can hire and pay each other | 5101-5105 |
+| `frontend/` | Next.js web app with a QoreX connector | 3000 |
+| `tools/qorex-test/` | Browser page used to confirm QoreX behaviour | 8765 |
+| `docs/` | Specification and AI usage notes. The older architecture notes there predate this version | - |
 
----
+`demo-agents/`, `design/` and `backend/postman/` are not updated for QoreChain and are not needed to run the app.
 
-## Quick start
+## Run it
 
-### Prerequisites
+You need Node.js 22+, a PostgreSQL 16+ database (for example [Neon](https://neon.tech)), an
+[NVIDIA API key](https://build.nvidia.com), [Foundry](https://getfoundry.sh) (contracts only), and the QoreX browser
+extension switched to testnet.
 
-- Node.js 22 or newer
-- A **Neon** (or any PostgreSQL 16) database URL
-- **Foundry**, only if you want to build or test the contracts: `curl -L https://foundry.paradigm.xyz | bash`, then `foundryup`
-- A **NEAR AI Cloud API key** with credits (create it at https://cloud.near.ai). NVIDIA is still supported with `LLM_PROVIDER=nvidia`
-- Two **ECDSA** Hedera testnet accounts with testnet HBAR from the [Hedera faucet](https://portal.hedera.com/faucet): a
-  *relayer* (pays gas) and a *verifier* (signs verdicts; needs no HBAR). Use hex-encoded private keys and testnet
-  accounts only.
-- MetaMask, for funding a job from the browser
-- Optional: a GitHub OAuth app (private repos) and a funded 0G testnet key (report storage)
-
-### 1. Backend
+**1. Configuration and accounts**
 
 ```bash
 cd backend
-npm i
-cp .env.example .env      # then fill it in (see "Configuration")
-npm run db:push           # creates the tables
-npm run dev               # API on PORT (default 4000), x402 gateway on GATEWAY_PORT (default 4402)
+npm install
+cp .env.example .env       # set DATABASE_URL, NVIDIA_API_KEY, SOLIDITY_AGENT_SECRET (any long random string)
+npm run setup:accounts     # creates the missing testnet keys and prints their addresses
+npm run db:push            # creates the tables
 ```
 
-Check it: `curl http://localhost:4000/health`
+Fund the printed addresses from the [faucet](https://dashboard.qorechain.io/faucet) (suggested: operator 20 QOR,
+designer 10, each agent 5; the verifier needs none), then run `npm run setup:accounts` again to register their
+post-quantum keys. **Back up `.env`**: the recovery codes cannot be re-derived.
 
-### 2. Solidity designer agent
-
-```bash
-cd solidity-agent
-npm i
-cp .env.example .env      # DESIGNER_PRIVATE_KEY, TASK_FACTORY_ADDRESS, AGENT_SHARED_SECRET, NEAR_AI_API_KEY
-npm run dev               # port 5001
-```
-
-`AGENT_SHARED_SECRET` must equal `SOLIDITY_AGENT_SECRET` in `backend/.env`. The designer wallet is the only address
-allowed to deploy task contracts, and it needs HBAR for gas.
-
-### 3. List agents and run them
-
-```bash
-# in backend/: lists the five live agents (creates payout accounts, API keys) - safe to re-run
-npm run seed:agents
-
-cd ../live-agents
-npm i
-cp .env.example .env      # BACKEND_URL, BACKEND_SECRET (must match backend/.env), NEAR_AI_API_KEY
-npm run all               # starts all five agents (5101-5105)
-```
-
-`seed:agents` reuses the agents recorded in `live-agents/agents.json` (gitignored). If that file is lost, a re-run creates
-a second set of agents and the marketplace shows duplicates, so keep the file, or hide the old rows (set their
-`status` to `draft`).
-
-Optional extra agent: `cd demo-agents && npm i && cp .env.example .env && npm run auditor` (needs the `AGENT_KEY` that
-`POST /agents` returned when the agent was created).
-
-### 4. Frontend
-
-```bash
-cd frontend
-npm i
-cp .env.example .env.local   # NEXT_PUBLIC_API_URL, NEXT_PUBLIC_GATEWAY_URL, NEXT_PUBLIC_HEDERA_RPC
-npm run dev                  # http://localhost:3000
-```
-
-If your backend runs on a port other than 4000, set `NEXT_PUBLIC_API_URL` to match.
-
-### 5. Try the whole flow without the UI
-
-With the backend, designer and live agents running and agents seeded:
+**2. Your own contract factory.** The deployed factory only accepts the project's keys, so deploy one for yours. The
+deployer (operator) first needs an open EVM window:
 
 ```bash
 cd backend
-npm run live-flow       # post a job -> quotes -> accept -> fund over x402 -> work -> verify -> release -> sub-agent paid
-npm run flow            # older end-to-end script using a local stub sub-agent
-```
+node scripts/qore/open-window.mjs OPERATOR 20 30000000
 
-These spend a little testnet HBAR from the relayer account. Use `API_URL` and `GATEWAY_URL` to point at non-default ports.
-
----
-
-## Configuration
-
-Every service has a `.env.example`. Copy it to `.env` and fill it in. **Never commit `.env` or private keys.**
-
-Main `backend/.env` values:
-
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Postgres connection string (Neon needs `?sslmode=require`) |
-| `PORT`, `CORS_ORIGIN`, `API_PUBLIC_URL` | API port, allowed browser origin, URL agents use to call back |
-| `RELAYER_PRIVATE_KEY` | Testnet key that pays gas for escrow calls |
-| `VERIFIER_PRIVATE_KEY` | Testnet key that signs verdicts and sub-leg approvals |
-| `LLM_PROVIDER` (`near` default or `nvidia`), `NEAR_AI_API_KEY`, `NEAR_AI_BASE_URL`, `NEAR_AI_MODEL` (+ `NVIDIA_*` when `LLM_PROVIDER=nvidia`) | AI for benchmark, verification and checklists. Pick a verifiable (TEE) model from `GET https://cloud-api.near.ai/v1/model/list` |
-| `SOLIDITY_AGENT_URL`, `SOLIDITY_AGENT_SECRET` | Where the designer agent lives, and the shared secret for `/deploy` |
-| `BACKEND_SECRET` | Optional. Sent to agents as `x-backend-secret`; each agent must use the same value |
-| `X402_FACILITATOR_URL`, `GATEWAY_PORT`, `GATEWAY_PUBLIC_URL` | x402 gateway (testnet facilitator by default) |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`, `FRONTEND_URL` | Optional GitHub OAuth for private repos |
-| `GITHUB_TOKEN` | Optional. Raises GitHub's 60 requests/hour unauthenticated limit |
-| `BACKEND_0G_PRIVATE_KEY` | Optional. Stores reports on 0G Storage; otherwise they stay in Postgres |
-| `BENCHMARK_PASS_SCORE`, `BENCHMARK_CUSTOM_WEIGHT` | Pass mark (default 80) and the share of the score from plain-code checks (default 0.4) |
-| `INDEXER_ENABLED` | Set to `false` to turn off the mirror-node indexer |
-
----
-
-## Smart contracts
-
-Solidity 0.8.24, Foundry, `evm_version = "paris"`. See [contracts/README.md](contracts/README.md).
-
-- `TaskFactory`: only the designer can deploy; it enforces hard bounds on the dynamic terms.
-- `TaskEscrow`: one contract per task. `fund` / `confirmFunding`, `submit`, `release`, `refund`, `refundAfterDeadline`,
-  `addSubLeg`, `recordPayout`, `markDefault`. Verdicts and sub-leg approvals are EIP-712 messages signed by the verifier;
-  the signature domain includes the contract address, so a signature cannot be replayed on another task. Nonces are
-  single use.
-- Deployed addresses: [contracts/deployments.json](contracts/deployments.json).
-
-```bash
-cd contracts
-forge install foundry-rs/forge-std --no-git   # first time only
-forge build
+cd ../contracts
+forge install foundry-rs/forge-std --no-git
 forge test
+forge create src/TaskFactory.sol:TaskFactory --rpc-url https://evm-testnet.qore.host \
+  --private-key <OPERATOR_PRIVATE_KEY> --legacy --gas-price 120000000000 --broadcast \
+  --constructor-args <DESIGNER_0x> <OPERATOR_0x> <VERIFIER_0x>
 ```
 
----
+Put the new address in `TASK_FACTORY_ADDRESS` in `backend/.env`.
 
-## Authentication
+**3. Start the services**, one terminal each:
 
-Sign in with a wallet: the backend issues a nonce, the wallet signs it, and `POST /auth/verify` returns a session token
-(sent as `Authorization: Bearer <token>`). Accounts can also add an email and password (`POST /auth/signup`) as a second
-factor. Agents authenticate to the backend with their own API key in the `x-agent-key` header (shown once when the
-agent is created).
+```bash
+cd backend && npm run dev                                  # API, indexer and keeper
+cd solidity-agent && npm install && npm run dev            # designer; reads ../backend/.env
+cd backend && npm run seed:agents                          # once: lists the five agents
+cd live-agents && npm install && npm run all               # the five agents
+cd frontend && npm install && cp .env.example .env.local && npm run dev
+```
 
-For API testing without a wallet UI: `cd backend && npm run token` prints a login token. A Postman collection is in
-[backend/postman/AgentForge.postman_collection.json](backend/postman/AgentForge.postman_collection.json).
+Open http://localhost:3000. If port 5001 is taken, set `DESIGNER_PORT` and change `SOLIDITY_AGENT_URL` to match.
 
----
+## Tests
 
-## API overview
+| Where | Command | Covers |
+|---|---|---|
+| `contracts/` | `forge test` | 28 tests: funding paths, settlement, caps, replay, excess returns |
+| `backend/` | `npm test` | 74 tests: payment and sign-in verification, window and keeper rules, state machine, checks |
+| `solidity-agent/` | `npm test` | 27 tests: contract term design, trust scoring, window rules |
+| `live-agents/` | `npm test` | 5 tests: agent spend control |
+| `backend/` | `node scripts/qore/smoke.mjs` | The escrow cycle on the live testnet (needs open windows) |
 
-| Area | Endpoints |
-|---|---|
-| Auth and account | `POST /auth/nonce`, `/auth/verify`, `/auth/signup`; `GET/PATCH /me`, `POST /me/password`, `GET /me/summary` |
-| Agents | `POST /agents`, `GET /agents`, `GET /agents/mine`, `GET /agents/:id`, `POST /agents/:id/unlist` |
-| Benchmark | `POST /agents/:id/benchmark`, `GET /agents/:id/benchmark/:runId`, `GET /agents/:id/benchmarks` |
-| GitHub | `GET /github/connect`, `/github/callback`, `/github/status`, `/github/repos`; `DELETE /github/connection` |
-| Requests and quotes | `POST /requests`, `GET /requests`, `GET /requests/:id`, `POST /requests/:id/request-quotes`, `POST /requests/:id/quotes` |
-| Agreements | `POST /quotes/:id/terms` (preview), `POST /quotes/:id/accept`, `GET /agreements`, `GET /agreements/:id`, `/design`, `/funding`, `/payouts`, `POST /agreements/:id/escrow` and `/dispatch` (retries) |
-| Delivery | `POST /agreements/:id/submit`, `POST /agreements/:id/verify`, `GET /agreements/:id/verification`, `POST /agreements/:id/settle` (retry) |
-| Agent-to-agent | `POST /a2a/quote`, `POST /a2a/call`, `GET /agreements/:id/a2a` |
-| Agent polling | `GET /agent/requests`, `GET /agent/tasks` |
-| x402 gateway (port 4402) | `GET /x402/fund/:agreementId`, `GET /x402/settle/:agreementId/:legId` |
+## Known limits
+
+- The verifier and operator are platform keys: the platform is trusted to judge work and to relay transactions.
+- A verdict is a model's judgement plus fixed checks, not a hardware-attested computation, and it is not post-quantum
+  signed.
+- If the model service, the chain or the database is unavailable, the app shows an error and can retry. An outage never
+  becomes a FAIL verdict.
+- The five demo agents are seeded and shown as not benchmarked. Listing your own agent (GitHub repository plus
+  benchmark) was not re-tested in this version.
+- The job's deadline on chain is set by the designer (usually hours) and can be earlier than the date the client picked.
+- The explorer does not look up EVM transaction hashes and has no link that selects testnet.
+
+## AI usage
+
+See [AI_USAGE.md](AI_USAGE.md): what AI built, what AI does inside the product, and how its output is checked.
+
+## Licence
+
+[MIT](LICENSE)
